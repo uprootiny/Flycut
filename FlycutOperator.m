@@ -28,7 +28,7 @@
 - (id)init
 {
 	[[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
-		[NSNumber numberWithInt:40],
+		[NSNumber numberWithInt:500],
 		@"rememberNum",
         [NSNumber numberWithInt:40],
         @"favoritesRememberNum",
@@ -149,7 +149,7 @@
 	{
 		newRemember = oldRemeber;
 		if ( newRemember <= 0 )
-			newRemember = 40;
+			newRemember = 500;
 	}
 
 	if ( newRemember < [self jcListCount] &&

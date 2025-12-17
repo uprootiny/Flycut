@@ -280,7 +280,7 @@
                                                     </textField>
                                                     <stepper toolTip="Controls how many clippings Flycut stores in its stack" horizontalHuggingPriority="750" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="472">
                                                         <rect key="frame" x="113" y="320" width="19" height="28"/>
-                                                        <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="999" doubleValue="10" valueWraps="YES" id="760"/>
+                                                        <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="9999" doubleValue="10" valueWraps="YES" id="760"/>
                                                         <connections>
                                                             <action selector="setRememberNumPref:" target="213" id="485"/>
                                                             <binding destination="808" name="value" keyPath="values.rememberNum" id="829"/>
@@ -355,7 +355,7 @@
                                                     </textField>
                                                     <stepper toolTip="Controls how many clippings Flycut stores in its favorites stack" horizontalHuggingPriority="750" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="wZv-HJ-VdW">
                                                         <rect key="frame" x="380" y="320" width="19" height="28"/>
-                                                        <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="999" doubleValue="10" valueWraps="YES" id="gUi-gl-RH6"/>
+                                                        <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="9999" doubleValue="10" valueWraps="YES" id="gUi-gl-RH6"/>
                                                         <connections>
                                                             <action selector="setFavoritesRememberNumPref:" target="213" id="rm7-TX-1af"/>
                                                             <binding destination="808" name="value" keyPath="values.favoritesRememberNum" id="nUm-81-DgP"/>
