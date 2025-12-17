@@ -71,10 +71,11 @@ jobs:
           mkdir -p dist
           cp -R "$APP_PATH" dist/
           
-          # Create simple DMG
+          # Create DMG compatible with older macOS (10.11+)
           hdiutil create -volname "Flycut" \
             -srcfolder dist \
-            -ov -format UDZO \
+            -ov -format UDBZ \
+            -fs HFS+ \
             Flycut.dmg
           
           # Also create ZIP for easier download
