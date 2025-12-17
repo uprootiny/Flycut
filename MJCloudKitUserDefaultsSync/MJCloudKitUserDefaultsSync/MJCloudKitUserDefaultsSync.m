@@ -1051,42 +1051,53 @@ withContainerIdentifier:(nonnull NSString *)containerIdentifier {
 - (void)attemptToEnable {
 	dispatch_suspend(startStopQueue);
 	DLog(@"Attempting to enable");
-	[[CKContainer defaultContainer] accountStatusWithCompletionHandler:^(CKAccountStatus accountStatus, NSError *error) {
-		switch ( accountStatus ) {
-			case CKAccountStatusAvailable:  // is iCloud enabled
-				DLog(@"iCloud Available");
-				[self startObservingActivity];
-				break;
 
-			case CKAccountStatusNoAccount:
-				DLog(@"No iCloud account");
-				if ( [delegate respondsToSelector:@selector(notifyCKAccountStatusNoAccount)] )
-					[delegate notifyCKAccountStatusNoAccount];
-				[self stopObservingActivity];
-				dispatch_resume(startStopQueue);
+	// Wrap CloudKit access in try-catch for unsigned builds without entitlements
+	@try {
+		[[CKContainer defaultContainer] accountStatusWithCompletionHandler:^(CKAccountStatus accountStatus, NSError *error) {
+			switch ( accountStatus ) {
+				case CKAccountStatusAvailable:  // is iCloud enabled
+					DLog(@"iCloud Available");
+					[self startObservingActivity];
+					break;
 
-				[self decrementUserActions];
-				break;
+				case CKAccountStatusNoAccount:
+					DLog(@"No iCloud account");
+					if ( [delegate respondsToSelector:@selector(notifyCKAccountStatusNoAccount)] )
+						[delegate notifyCKAccountStatusNoAccount];
+					[self stopObservingActivity];
+					dispatch_resume(startStopQueue);
 
-			case CKAccountStatusRestricted:
-				DLog(@"iCloud restricted");
-				[self stopObservingActivity];
-				dispatch_resume(startStopQueue);
+					[self decrementUserActions];
+					break;
 
-				[self decrementUserActions];
-				break;
+				case CKAccountStatusRestricted:
+					DLog(@"iCloud restricted");
+					[self stopObservingActivity];
+					dispatch_resume(startStopQueue);
 
-			case CKAccountStatusCouldNotDetermine:
-				DLog(@"Unable to determine iCloud status");
-				[self stopObservingActivity];
-				dispatch_resume(startStopQueue);
+					[self decrementUserActions];
+					break;
 
-				[self decrementUserActions];
-				break;
-		}
+				case CKAccountStatusCouldNotDetermine:
+					DLog(@"Unable to determine iCloud status");
+					[self stopObservingActivity];
+					dispatch_resume(startStopQueue);
 
-		[self startObservingIdentityChanges];
-	}];
+					[self decrementUserActions];
+					break;
+			}
+
+			[self startObservingIdentityChanges];
+		}];
+	}
+	@catch (NSException *exception) {
+		// CloudKit entitlements missing (unsigned build) - disable iCloud sync gracefully
+		NSLog(@"CloudKit unavailable (unsigned build or missing entitlements): %@", exception.reason);
+		[self stopObservingActivity];
+		dispatch_resume(startStopQueue);
+		[self decrementUserActions];
+	}
 }
 
 - (void)startObservingActivity {

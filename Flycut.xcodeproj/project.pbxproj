@@ -1642,8 +1642,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
 				MARKETING_VERSION = 1.9.6;
-				PRODUCT_BUNDLE_IDENTIFIER = com.generalarcade.flycut;
-				PRODUCT_NAME = Flycut;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.uprootiny.conchis;
+				PRODUCT_NAME = Conchis;
 				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
 				ZERO_LINK = YES;
@@ -1676,8 +1676,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
 				MARKETING_VERSION = 1.9.6;
-				PRODUCT_BUNDLE_IDENTIFIER = com.generalarcade.flycut;
-				PRODUCT_NAME = Flycut;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.uprootiny.conchis;
+				PRODUCT_NAME = Conchis;
 				PROVISIONING_PROFILE = "";
 				STRIP_INSTALLED_PRODUCT = YES;
 				WRAPPER_EXTENSION = app;

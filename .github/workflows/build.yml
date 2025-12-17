@@ -1,4 +1,4 @@
-name: Build Flycut
+name: Build Conchis
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
       run: |
         xcodebuild clean -project Flycut.xcodeproj -scheme Flycut
 
-    - name: Build Flycut (unsigned)
+    - name: Build Conchis (unsigned)
       run: |
         xcodebuild \
           -project Flycut.xcodeproj \
@@ -65,56 +65,56 @@ jobs:
 
     - name: Package app
       run: |
-        APP_PATH="build/Build/Products/Release/Flycut.app"
+        APP_PATH="build/Build/Products/Release/Conchis.app"
         if [ -d "$APP_PATH" ]; then
           # Create DMG
           mkdir -p dist
           cp -R "$APP_PATH" dist/
-          
+
           # Create DMG compatible with older macOS (10.11+)
-          hdiutil create -volname "Flycut" \
+          hdiutil create -volname "Conchis" \
             -srcfolder dist \
             -ov -format UDBZ \
             -fs HFS+ \
-            Flycut.dmg
-          
+            Conchis.dmg
+
           # Also create ZIP for easier download
-          cd dist && zip -r ../Flycut.zip Flycut.app && cd ..
+          cd dist && zip -r ../Conchis.zip Conchis.app && cd ..
         else
           echo "App not found at expected path, searching..."
-          find build -name "Flycut.app" -type d
+          find build -name "*.app" -type d
           exit 1
         fi
 
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Flycut-dmg
-        path: Flycut.dmg
+        name: Conchis-dmg
+        path: Conchis.dmg
         retention-days: 30
 
     - name: Upload ZIP artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Flycut-zip
-        path: Flycut.zip
+        name: Conchis-zip
+        path: Conchis.zip
         retention-days: 30
 
     - name: Upload app bundle
       uses: actions/upload-artifact@v4
       with:
-        name: Flycut-app
-        path: dist/Flycut.app
+        name: Conchis-app
+        path: dist/Conchis.app
         retention-days: 30
 
   release:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     permissions:
       contents: write
-    
+
     steps:
     - name: Download artifacts
       uses: actions/download-artifact@v4
@@ -125,8 +125,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          artifacts/Flycut-dmg/Flycut.dmg
-          artifacts/Flycut-zip/Flycut.zip
+          artifacts/Conchis-dmg/Conchis.dmg
+          artifacts/Conchis-zip/Conchis.zip
         draft: false
         prerelease: false
         generate_release_notes: true

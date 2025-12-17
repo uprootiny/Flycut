@@ -1,21 +1,23 @@
-# Flycut (uprootiny fork)
+# Conchis
 
 A clean, fast, keyboard-driven clipboard manager for macOS.
 
-**This fork targets macOS 10.11+ (El Capitan)** while adding modern improvements.
+**Targets macOS 10.11+ (El Capitan)** - works on older Intel Macs.
 
-## What's Different
+## What is Conchis?
 
-This fork of [TermiT/Flycut](https://github.com/TermiT/Flycut) includes:
+Conchis (from Greek *konche*, shell) is a fork of [Flycut](https://github.com/TermiT/Flycut) with:
 
-- **Increased storage**: Up to 9,999 clipboard entries (default 500)
+- **Massive storage**: Up to 9,999 clipboard entries (default 500)
 - **CI/CD builds**: Automated unsigned builds via GitHub Actions
-- **10.11 compatibility**: Works on older Intel Macs
-- **Active development**: Quicksilver-style UI improvements planned
+- **10.11 compatibility**: Works on El Capitan and newer
+- **Active development**: Building toward Quicksilver-style functionality
+
+The conchoidal icon represents the smooth, curved fracture patterns found in shells and obsidian - a nod to both the name and the app's goal of smooth, frictionless clipboard management.
 
 ## Download
 
-Get the latest build from [GitHub Actions](https://github.com/uprootiny/Flycut/actions) - download the `Flycut-zip` artifact.
+Get the latest build from [GitHub Actions](https://github.com/uprootiny/Flycut/actions) - download the `Conchis-zip` artifact.
 
 Since the app is unsigned, on first launch:
 1. Right-click the app → Open
@@ -30,41 +32,42 @@ Since the app is unsigned, on first launch:
 - **Search**: Filter clips by content
 - **Minimal**: Does one thing well
 
-## Planned Improvements
+## Roadmap
 
-- [ ] Quicksilver-style popup UI
+Building toward Quicksilver-style functionality, step by step:
+
+- [ ] Quicksilver-style floating popup UI
+- [ ] Comma trick for chaining actions
 - [ ] Unlimited persistent storage (save all pastes forever)
-- [ ] Better hotkey configuration
+- [ ] Clean hotkey configuration UI
 - [ ] Apple HIG-compliant preferences
-- [ ] Automatic grouping
+- [ ] Automatic grouping by app/time
 - [ ] Enhanced filtering and navigation
+- [ ] Comprehensive test coverage
 
 ## Building
 
 ```bash
-# Clone
 git clone https://github.com/uprootiny/Flycut.git
 cd Flycut
-
-# Build (requires Xcode)
 xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release build
 ```
 
-Or let GitHub Actions build it - push to trigger a build.
+Or push to trigger GitHub Actions.
 
 ## Philosophy
 
 > "Write programs that do one thing and do it well." — Unix Philosophy
 
-This fork aims to be:
-- **Minimal**: No bloat, no unnecessary features
-- **Fast**: Instant response, low resource usage
+Conchis aims to be:
+- **Minimal**: No bloat
+- **Fast**: Instant response
 - **Reliable**: Never lose a paste
-- **Compatible**: Works on older hardware
+- **Compatible**: Runs on older hardware
 
 ## License
 
-MIT License - see original [Flycut](https://github.com/TermiT/Flycut) for details.
+MIT License - see original [Flycut](https://github.com/TermiT/Flycut).
 
 ## Credits
 

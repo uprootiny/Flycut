@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>${EXECUTABLE_NAME}</string>
 	<key>CFBundleIconFile</key>
-	<string>flycut.icns</string>
+	<string>conchis.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -27,9 +27,9 @@
 	<key>LSUIElement</key>
 	<string>1</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Flycut needs this permission to be able to paste text into other applications, and add itself to Login Items to be launched on login.</string>
+	<string>Conchis needs this permission to paste text into other applications and add itself to Login Items.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>(c) General Arcade, 2011-2020</string>
+	<string>Conchis - a Flycut fork. Original (c) General Arcade, 2011-2020</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
