@@ -49,42 +49,19 @@ jobs:
 
     - name: Build Flycut (unsigned)
       run: |
-        # Use archive to avoid script phase cycle issue
         xcodebuild \
           -project Flycut.xcodeproj \
           -scheme Flycut \
           -configuration Release \
-          -archivePath build/Flycut.xcarchive \
-          CODE_SIGN_IDENTITY="-" \
+          -derivedDataPath build \
+          CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
           ONLY_ACTIVE_ARCH=NO \
           MACOSX_DEPLOYMENT_TARGET=10.11 \
           GCC_TREAT_WARNINGS_AS_ERRORS=NO \
-          archive
-
-    - name: Export app from archive
-      run: |
-        # Create export options plist
-        cat > ExportOptions.plist << 'EOPLIST'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>method</key>
-            <string>mac-application</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-        </dict>
-        </plist>
-        EOPLIST
-
-        # Extract app from archive directly
-        mkdir -p build/Build/Products/Release
-        cp -R "build/Flycut.xcarchive/Products/Applications/Flycut.app" build/Build/Products/Release/ 2>/dev/null || \
-        cp -R "build/Flycut.xcarchive/Products/usr/local/bin/"* build/Build/Products/Release/ 2>/dev/null || \
-        find build/Flycut.xcarchive -name "Flycut.app" -exec cp -R {} build/Build/Products/Release/ \;
+          build
 
     - name: Package app
       run: |
