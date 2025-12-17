@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-12  # Intel runner with older Xcode support
+    runs-on: macos-13  # Available runner with older Xcode support
 
     steps:
     - name: Checkout repository
@@ -21,7 +21,7 @@ jobs:
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '14.2'  # Older Xcode with libarclite support
+        xcode-version: '14.1'  # Xcode 14.1 has libarclite for older targets
 
     - name: Show Xcode version
       run: |
