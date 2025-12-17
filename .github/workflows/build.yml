@@ -43,6 +43,10 @@ jobs:
       run: |
         xcodebuild -list -project Flycut.xcodeproj
 
+    - name: Clean before build
+      run: |
+        xcodebuild clean -project Flycut.xcodeproj -scheme Flycut
+
     - name: Build Flycut (unsigned)
       run: |
         xcodebuild \
@@ -56,6 +60,7 @@ jobs:
           DEVELOPMENT_TEAM="" \
           ONLY_ACTIVE_ARCH=NO \
           MACOSX_DEPLOYMENT_TARGET=10.11 \
+          -parallelizeTargets NO \
           build
 
     - name: Package app
