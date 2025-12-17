@@ -44,6 +44,7 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
           ONLY_ACTIVE_ARCH=NO \
+          MACOSX_DEPLOYMENT_TARGET=10.13 \
           build
 
     - name: Package app
