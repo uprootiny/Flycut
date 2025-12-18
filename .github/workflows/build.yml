@@ -97,9 +97,11 @@ jobs:
           cp -R "$APP_PATH" dist/
 
           # Create DMG compatible with older macOS (10.11+)
+          # Use UDZO (zlib) instead of UDBZ (bzip2) for better compatibility
           hdiutil create -volname "Conchis" \
             -srcfolder dist \
-            -ov -format UDBZ \
+            -ov -format UDZO \
+            -imagekey zlib-level=9 \
             -fs HFS+ \
             Conchis.dmg
 
