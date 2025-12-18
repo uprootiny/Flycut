@@ -13,6 +13,7 @@
 #import <AppKit/AppKit.h>
 
 static const float lineHeight = 16;
+static const float searchFieldHeight = 24;
 
 @implementation BezelWindow
 
@@ -113,7 +114,23 @@ static const float lineHeight = 16;
 			[charField.heightAnchor constraintEqualToConstant:charFrame.size.height],
 		]];
 
-		[self setInitialFirstResponder:textField];         
+		// Search field for filtering clippings
+		NSRect searchFrame = [self searchFrame];
+		searchField = [[NSTextField alloc] initWithFrame:searchFrame];
+		[[self contentView] addSubview:searchField];
+		[searchField setEditable:YES];
+		[searchField setSelectable:YES];
+		[searchField setBordered:NO];
+		[searchField setDrawsBackground:YES];
+		[searchField setBackgroundColor:[NSColor colorWithCalibratedWhite:0.2 alpha:0.8]];
+		[searchField setTextColor:[NSColor whiteColor]];
+		[searchField setFocusRingType:NSFocusRingTypeNone];
+		[[searchField cell] setPlaceholderString:@"Filter..."];
+		[searchField setFont:[NSFont systemFontOfSize:14]];
+		[searchField setDelegate:(id<NSTextFieldDelegate>)self];
+		searchField.layer.cornerRadius = 4.0;
+
+		[self setInitialFirstResponder:searchField];
 		return self;
 	}
 	return nil;
@@ -132,11 +149,13 @@ static const float lineHeight = 16;
     [textField setFrame:textFrame];
     NSRect charFrame = [self charFrame];
     [charField setFrame:charFrame];
+    NSRect searchFrameRect = [self searchFrame];
+    [searchField setFrame:searchFrameRect];
     if (showSourceField)
         [sourceFieldBackground.background.layer setBackgroundColor:CGColorCreateGenericRGB(0.1, 0.1, 0.1, 0.45)];
     else if ( nil != sourceFieldApp )
         [sourceFieldBackground.background.layer setBackgroundColor:CGColorCreateGenericRGB(0.1, 0.1, 0.1, 0.0)];
-    
+
     showSourceField = savedShowSourceField;
 
 }
@@ -176,11 +195,22 @@ static const float lineHeight = 16;
     return frame;
 }
 
+-(NSRect) searchFrame
+{
+    int adjustHeight = 0;
+    if (showSourceField) adjustHeight = 1.8 * lineHeight + 5;
+    // Search field at top (below source field if present)
+    return NSMakeRect(12, self.frame.size.height - 12 - searchFieldHeight - adjustHeight,
+                      self.frame.size.width - 24, searchFieldHeight);
+}
+
 -(NSRect) textFrame
 {
     int adjustHeight = 0;
     if (showSourceField) adjustHeight = 1.8 * lineHeight;
-    return NSMakeRect(12, 36, self.frame.size.width - 24, self.frame.size.height - 50 - adjustHeight);
+    // Text frame now accounts for search field at top
+    return NSMakeRect(12, 36, self.frame.size.width - 24,
+                      self.frame.size.height - 50 - adjustHeight - searchFieldHeight - 8);
 }
 
 -(NSRect) charFrame
@@ -314,6 +344,8 @@ static const float lineHeight = 16;
 
 - (void)dealloc
 {
+	[searchField setDelegate:nil];
+	[searchField release];
 	[textField release];
 	[charField release];
 	[iconView release];
@@ -374,6 +406,28 @@ static const float lineHeight = 16;
 - (void)setDelegate:(id<BezelWindowDelegate>)newDelegate {
     delegate = newDelegate;
 	super.delegate = newDelegate;
+}
+
+#pragma mark - Search Field Methods
+
+- (void)clearSearch {
+    [searchField setStringValue:@""];
+}
+
+- (void)focusSearchField {
+    [self makeFirstResponder:searchField];
+}
+
+- (NSString *)searchText {
+    return [searchField stringValue];
+}
+
+#pragma mark - NSTextFieldDelegate
+
+- (void)controlTextDidChange:(NSNotification *)notification {
+    if ([notification object] == searchField && delegate) {
+        [delegate bezelSearchTextChanged:[searchField stringValue]];
+    }
 }
 
 @end

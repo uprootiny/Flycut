@@ -4,8 +4,10 @@ Unit tests for the Conchis clipboard manager (Flycut fork).
 
 ## Test Files
 
-- `FlycutClippingTests.m` - Tests for the `FlycutClipping` data model class
-- `FlycutStoreTests.m` - Tests for the `FlycutStore` clipboard history storage engine
+- `FlycutClippingTests.m` - Tests for the `FlycutClipping` data model class (~25 tests)
+- `FlycutStoreTests.m` - Tests for the `FlycutStore` clipboard history storage engine (~30 tests)
+- `FlycutOperatorTests.m` - Tests for the `FlycutOperator` coordinator class (~45 tests)
+- `BezelSearchTests.m` - Tests for bezel search filtering functionality (~15 tests)
 
 ## Running Tests
 
@@ -52,6 +54,31 @@ xcodebuild test \
 - Modified state tracking
 - Delegate callback verification (using mock delegate)
 - Edge cases (empty store, invalid indexes)
+
+### FlycutOperator Tests
+- Initialization and configuration
+- Add clipping operations (valid, empty, multiple)
+- Stack position management (bounds checking, navigation)
+- Directional navigation (one more/less recent, ten more/less, first/last)
+- Get paste operations (from stack position, from index, empty store)
+- Clear operations (single item, clear all)
+- Favorites store (switch, restore, toggle, save to favorites)
+- Disable store functionality
+- Search operations (display strings, indexes)
+- Index lookup (existing, nonexistent clippings)
+- Clipping retrieval (at stack position, valid numbers)
+- Merge list functionality
+- Edge cases (empty store operations, position after clear)
+
+### BezelSearchTests
+- Search filtering (finding matches, case insensitivity)
+- Empty and no-match queries
+- Partial matching
+- Correct index mapping
+- Navigation within filtered results
+- Edge cases (empty store, special characters, whitespace, newlines, unicode, emoji)
+- Limit parameter handling
+- Display strings and indexes consistency
 
 ## Writing New Tests
 

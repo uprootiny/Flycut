@@ -77,6 +77,11 @@
     int jcDisplayNum;
 	BOOL needBezelUpdate;
 	BOOL needMenuUpdate;
+
+	// Bezel search state
+	NSString *bezelSearchText;
+	NSArray *bezelFilteredIndexes;
+	NSInteger bezelFilteredPosition;
 }
 
 + (BOOL)isAppSandboxed;
@@ -103,6 +108,7 @@
 -(void) processBezelKeyDown:(NSEvent *)theEvent;
 -(void) processBezelMouseEvents:(NSEvent *)theEvent;
 -(void) metaKeysReleased;
+-(void) bezelSearchTextChanged:(NSString *)searchText;
 -(void) windowDidResignKey:(NSNotification *)notification;
 
 // Menu related

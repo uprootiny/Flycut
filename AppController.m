@@ -918,8 +918,14 @@
 		unichar pressed = [[theEvent charactersIgnoringModifiers] characterAtIndex:0];
         NSUInteger modifiers = [theEvent modifierFlags];
 		switch (pressed) {
-			case 0x1B:
-				[self hideApp];
+			case 0x1B: // Escape
+				// If searching, clear search first; otherwise hide
+				if (bezelSearchText && bezelSearchText.length > 0) {
+					[bezel clearSearch];
+					[self bezelSearchTextChanged:@""];
+				} else {
+					[self hideApp];
+				}
 				break;
             case 0xD: // Enter or Return
 				[self pasteFromStack];
@@ -932,15 +938,23 @@
                     [self showPreferencePanel:nil];
                 }
                 break;
-			case NSUpArrowFunctionKey: 
-			case NSLeftArrowFunctionKey: 
+			case NSUpArrowFunctionKey:
+			case NSLeftArrowFunctionKey:
             case 0x6B: // k
-				[self stackUp];
+				if (bezelFilteredIndexes && bezelFilteredIndexes.count > 0) {
+					[self bezelFilteredUp];
+				} else {
+					[self stackUp];
+				}
 				break;
-			case NSDownArrowFunctionKey: 
+			case NSDownArrowFunctionKey:
 			case NSRightArrowFunctionKey:
             case 0x6A: // j
-				[self stackDown];
+				if (bezelFilteredIndexes && bezelFilteredIndexes.count > 0) {
+					[self bezelFilteredDown];
+				} else {
+					[self stackDown];
+				}
 				break;
             case NSHomeFunctionKey:
 				if ( [flycutOperator setStackPositionToFirstItem] ) {
@@ -1093,6 +1107,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 //	else
     [bezel makeKeyAndOrderFront:self];
 	isBezelDisplayed = YES;
+	[bezel focusSearchField];
 }
 
 - (void) hideBezel
@@ -1100,6 +1115,14 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	[bezel orderOut:nil];
 	[bezel setCharString:@"Empty"];
 	isBezelDisplayed = NO;
+
+	// Clear search state
+	[bezelSearchText release];
+	bezelSearchText = nil;
+	[bezelFilteredIndexes release];
+	bezelFilteredIndexes = nil;
+	bezelFilteredPosition = 0;
+	[bezel clearSearch];
 }
 
 -(void)hideApp
@@ -1107,6 +1130,97 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	isBezelPinned = NO;
 	[self hideBezel];
 	[NSApp hide:self];
+}
+
+#pragma mark - Bezel Search
+
+-(void) bezelSearchTextChanged:(NSString *)searchText
+{
+	// Update search state
+	[bezelSearchText release];
+	bezelSearchText = [searchText copy];
+	[bezelFilteredIndexes release];
+	bezelFilteredIndexes = nil;
+	bezelFilteredPosition = 0;
+
+	if (searchText.length == 0) {
+		// No search - show normal stack position
+		[self updateBezel];
+		return;
+	}
+
+	// Get filtered indexes
+	int listCount = [flycutOperator jcListCount];
+	bezelFilteredIndexes = [[flycutOperator previousIndexes:listCount containing:searchText] retain];
+
+	if (bezelFilteredIndexes.count == 0) {
+		// No matches
+		[bezel setText:@"No matches"];
+		[bezel setCharString:[NSString stringWithFormat:@"0 of %d", listCount]];
+		[bezel setSource:@""];
+		[bezel setDate:@""];
+		[bezel setSourceIcon:nil];
+	} else {
+		// Show first match
+		[self fillBezelWithFilteredPosition];
+	}
+}
+
+-(void) fillBezelWithFilteredPosition
+{
+	if (!bezelFilteredIndexes || bezelFilteredIndexes.count == 0) {
+		[self updateBezel];
+		return;
+	}
+
+	// Clamp position
+	if (bezelFilteredPosition < 0) bezelFilteredPosition = 0;
+	if (bezelFilteredPosition >= (NSInteger)bezelFilteredIndexes.count) {
+		bezelFilteredPosition = bezelFilteredIndexes.count - 1;
+	}
+
+	// Get actual index from filtered list
+	NSInteger actualIndex = [[bezelFilteredIndexes objectAtIndex:bezelFilteredPosition] integerValue];
+
+	// Temporarily set stack position to show this item
+	[flycutOperator setStackPositionTo:(int)actualIndex];
+	FlycutClipping* clipping = [flycutOperator clippingAtStackPosition];
+
+	[bezel setText:[NSString stringWithFormat:@"%@", [clipping contents]]];
+	[bezel setCharString:[NSString stringWithFormat:@"%ld of %lu matches",
+						  (long)bezelFilteredPosition + 1,
+						  (unsigned long)bezelFilteredIndexes.count]];
+
+	NSString *localizedName = [clipping appLocalizedName];
+	if (nil == localizedName) localizedName = @"";
+	NSString* dateString = @"";
+	if ([clipping timestamp] > 0)
+		dateString = [dateFormat stringFromDate:[NSDate dateWithTimeIntervalSince1970:[clipping timestamp]]];
+	NSImage* icon = nil;
+	if (nil != [clipping appBundleURL])
+		icon = [[NSWorkspace sharedWorkspace] iconForFile:[clipping appBundleURL]];
+
+	[bezel setSource:localizedName];
+	[bezel setDate:dateString];
+	[bezel setSourceIcon:icon];
+}
+
+-(void) bezelFilteredUp
+{
+	if (!bezelFilteredIndexes || bezelFilteredIndexes.count == 0) return;
+	if (bezelFilteredPosition > 0) {
+		bezelFilteredPosition--;
+		[self fillBezelWithFilteredPosition];
+	}
+}
+
+-(void) bezelFilteredDown
+{
+	if (!bezelFilteredIndexes || bezelFilteredIndexes.count == 0) return;
+	if (bezelFilteredPosition < (NSInteger)bezelFilteredIndexes.count - 1) {
+		bezelFilteredPosition++;
+		[self fillBezelWithFilteredPosition];
+	}
 }
 
 - (void) applicationWillResignActive:(NSApplication *)app; {

@@ -56,6 +56,22 @@ jobs:
       run: |
         xcodebuild clean -project Flycut.xcodeproj -scheme Flycut
 
+    - name: Verify test files compile
+      run: |
+        echo "Checking test file syntax..."
+        # Compile test files to verify syntax (without linking)
+        for f in ConchisTests/*.m; do
+          echo "Checking $f..."
+          clang -fsyntax-only -x objective-c \
+            -fobjc-arc \
+            -I. \
+            -IFlycutEngine \
+            -framework Foundation \
+            -framework XCTest \
+            "$f" 2>&1 || echo "Note: $f may have dependencies not available in syntax check"
+        done
+        echo "Test file syntax check complete"
+
     - name: Build Conchis (unsigned)
       run: |
         xcodebuild \

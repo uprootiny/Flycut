@@ -19,6 +19,7 @@
 -(void)processBezelKeyDown:(NSEvent *)theEvent;
 -(void)processBezelMouseEvents:(NSEvent *)theEvent;
 -(void)metaKeysReleased;
+-(void)bezelSearchTextChanged:(NSString *)searchText;
 
 @end
 
@@ -40,6 +41,7 @@
 	RoundRecTextField	*textField;
 	RoundRecTextField	*charField;
 	NSImageView			*iconView;
+	NSTextField			*searchField;
 	id<BezelWindowDelegate>	delegate;
     Boolean             color;
 }
@@ -66,5 +68,10 @@
 
 - (id<BezelWindowDelegate>)delegate;
 - (void)setDelegate:(id<BezelWindowDelegate>)newDelegate;
+
+// Search field methods
+- (void)clearSearch;
+- (void)focusSearchField;
+- (NSString *)searchText;
 
 @end
