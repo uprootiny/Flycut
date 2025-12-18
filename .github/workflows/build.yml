@@ -43,7 +43,9 @@ jobs:
       run: |
         if [ -d "conchis.iconset" ]; then
           iconutil -c icns conchis.iconset -o conchis.icns
-          ls -la conchis.icns
+          # Replace old flycut.icns with new conchis icon
+          cp conchis.icns flycut.icns
+          ls -la flycut.icns conchis.icns
         fi
 
     - name: List schemes and targets
