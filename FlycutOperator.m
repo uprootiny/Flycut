@@ -772,7 +772,7 @@
 					promptUser = NO;
 
 					NSString *choice = [self delegateAlertWithMessageText:@"First Sync"
-														  informationText:[NSString stringWithFormat:@"Flycut found %i %@clipping%@ shared by both iCloud and this device, %i only in iCloud, and \%i only on this device.  How can I handle these for you?",
+														  informationText:[NSString stringWithFormat:@"Conchis found %i %@clipping%@ shared by both iCloud and this device, %i only in iCloud, and \%i only on this device.  How can I handle these for you?",
 																		   (ourCount-ourDistinct),
 																		   name,
 																		   ((ourCount-ourDistinct)!=1?@"s":@""),

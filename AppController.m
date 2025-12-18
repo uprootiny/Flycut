@@ -654,8 +654,8 @@
 
 	row = [self preferencePanelPopUpRowForText:@"Menu item icon"
 										 items:[NSArray arrayWithObjects:
-												@"Flycut icon",
-												@"Black Flycut icon",
+												@"Conchis icon",
+												@"Black Conchis icon",
 												@"White scissors",
 												@"Black scissors",nil]
 									 frameMaxY:nextYMax
@@ -1141,7 +1141,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	mainHotKey = [[SGHotKey alloc] initWithIdentifier:@"mainHotKey"
 											   keyCombo:[SGKeyCombo keyComboWithKeyCode:[mainRecorder keyCombo].code
 																			  modifiers:[mainRecorder cocoaToCarbonFlags: [mainRecorder keyCombo].flags]]];
-	[mainHotKey setName: @"Activate Flycut HotKey"]; //This is typically used by PTKeyComboPanel
+	[mainHotKey setName: @"Activate Conchis HotKey"]; //This is typically used by PTKeyComboPanel
 	[mainHotKey setTarget: self];
 	[mainHotKey setAction: @selector(hitMainHotKey:)];
 	[[SGHotKeyCenter sharedCenter] registerHotKey:mainHotKey];
@@ -1154,7 +1154,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 		[alert setMessageText:@"Warning"];
 		[alert addButtonWithTitle:@"Ok"];
 		[alert addButtonWithTitle:@"Cancel"];
-		[alert setInformativeText:@"Enabling iCloud Settings Sync will overwrite local settings if your iCloud account already has Flycut settings.  If you have never enabled this in Flycut on any computer, your current settings will be retained and loaded into iCloud."];
+		[alert setInformativeText:@"Enabling iCloud Settings Sync will overwrite local settings if your iCloud account already has Conchis/Flycut settings.  If you have never enabled this on any computer, your current settings will be retained and loaded into iCloud."];
 		if ( [alert runModal] != NSAlertFirstButtonReturn )
 		{
 			[[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:NO]
