@@ -98,6 +98,7 @@
 		8DF82B3F2098FA4F00E2A1B9 /* MJCloudKitUserDefaultsSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8DF82B3B2098F9CA00E2A1B9 /* MJCloudKitUserDefaultsSync.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AABE497C09FF9CD000A6A239 /* AppController.m in Sources */ = {isa = PBXBuildFile; fileRef = AABE497B09FF9CD000A6A239 /* AppController.m */; };
 		AAFAC85F0A1BD9DD00DC6025 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AAFAC84A0A1BD9DD00DC6025 /* Carbon.framework */; };
+		C0C0C0C01A1BD9DD00DC6025 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0C0C0C11A1BD9DD00DC6025 /* Security.framework */; };
 		DBEB0C9C1442F2AE0080D24E /* NSWindow+ULIZoomEffect.h in Headers */ = {isa = PBXBuildFile; fileRef = DBEB0C9A1442F2AE0080D24E /* NSWindow+ULIZoomEffect.h */; };
 		DBEB0C9D1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m in Sources */ = {isa = PBXBuildFile; fileRef = DBEB0C9B1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m */; };
 /* End PBXBuildFile section */
@@ -333,6 +334,7 @@
 		AABE497A09FF9CD000A6A239 /* AppController.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = AppController.h; sourceTree = "<group>"; };
 		AABE497B09FF9CD000A6A239 /* AppController.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = AppController.m; sourceTree = "<group>"; };
 		AAFAC84A0A1BD9DD00DC6025 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
+		C0C0C0C11A1BD9DD00DC6025 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = /System/Library/Frameworks/Security.framework; sourceTree = "<absolute>"; };
 		DBEB0C9A1442F2AE0080D24E /* NSWindow+ULIZoomEffect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSWindow+ULIZoomEffect.h"; sourceTree = "<group>"; };
 		DBEB0C9B1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSWindow+ULIZoomEffect.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -379,6 +381,7 @@
 				8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */,
 				77192A3823D6EADF00EDB9BC /* ServiceManagement.framework in Frameworks */,
 				AAFAC85F0A1BD9DD00DC6025 /* Carbon.framework in Frameworks */,
+				C0C0C0C01A1BD9DD00DC6025 /* Security.framework in Frameworks */,
 				77AE730623D2D49100F6A44B /* MJCloudKitUserDefaultsSync.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -412,6 +415,7 @@
 			children = (
 				AAFAC84A0A1BD9DD00DC6025 /* Carbon.framework */,
 				1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */,
+				C0C0C0C11A1BD9DD00DC6025 /* Security.framework */,
 			);
 			name = "Linked Frameworks";
 			sourceTree = "<group>";

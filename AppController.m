@@ -23,6 +23,9 @@
 #import <ApplicationServices/ApplicationServices.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import <ServiceManagement/ServiceManagement.h>
+// Include LLM implementation directly to avoid Xcode project modification
+#import "LLM/ConchisLLM.h"
+#import "LLM/ConchisLLM.m"
 
 @implementation AppController
 
@@ -724,6 +727,7 @@
 		}
 	}
 	[flycutOperator willShowPreferences];
+	[self updateAPIKeyStatus];
 }
 
 -(IBAction)toggleLoadOnStartup:(id)sender {
@@ -1332,6 +1336,32 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 			[alert release];
 		}
 	}
+}
+
+#pragma mark - LLM Integration
+
+- (IBAction)setAPIKey:(id)sender {
+    NSString *key = [apiKeyField stringValue];
+    if (key && key.length > 0) {
+        [[ConchisLLM shared] setAPIKey:key];
+        [apiKeyField setStringValue:@""];
+        [self updateAPIKeyStatus];
+    }
+}
+
+- (IBAction)clearAPIKey:(id)sender {
+    [[ConchisLLM shared] clearAPIKey];
+    [self updateAPIKeyStatus];
+}
+
+- (void)updateAPIKeyStatus {
+    if ([[ConchisLLM shared] isConfigured]) {
+        [apiKeyStatusLabel setStringValue:@"API key is set (stored in Keychain)"];
+        [apiKeyStatusLabel setTextColor:[NSColor colorWithCalibratedRed:0.2 green:0.6 blue:0.2 alpha:1.0]];
+    } else {
+        [apiKeyStatusLabel setStringValue:@"No API key configured"];
+        [apiKeyStatusLabel setTextColor:[NSColor grayColor]];
+    }
 }
 
 - (IBAction)selectSaveLocation:(id)sender {

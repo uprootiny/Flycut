@@ -52,6 +52,12 @@
     IBOutlet NSButton *forgottenClippingsCheckbox;
     IBOutlet NSButton *saveToLocationButton;
     IBOutlet NSButton *autoSaveToLocationButton;
+
+    // LLM Integration
+    IBOutlet NSSecureTextField *apiKeyField;
+    IBOutlet NSButton *apiKeySetButton;
+    IBOutlet NSTextField *apiKeyStatusLabel;
+
     // The menu attatched to same
     IBOutlet NSMenu *jcMenu;
     int jcMenuBaseItemsCount;
@@ -131,5 +137,9 @@
 -(IBAction) toggleICloudSyncClippings:(id)sender;
 -(IBAction) setSavePreference:(id)sender;
 -(void) setHotKeyPreferenceForRecorder:(SRRecorderControl *)aRecorder;
+
+// LLM Integration
+-(IBAction) setAPIKey:(id)sender;
+-(IBAction) clearAPIKey:(id)sender;
 
 @end
