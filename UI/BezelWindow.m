@@ -125,7 +125,15 @@ static const float searchFieldHeight = 24;
 		[searchField setBackgroundColor:[NSColor colorWithCalibratedWhite:0.2 alpha:0.8]];
 		[searchField setTextColor:[NSColor whiteColor]];
 		[searchField setFocusRingType:NSFocusRingTypeNone];
-		[[searchField cell] setPlaceholderString:@"Filter..."];
+		// Set placeholder with visible color on dark background
+		NSAttributedString *placeholder = [[NSAttributedString alloc]
+			initWithString:@"Filter..."
+			attributes:@{
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.6 alpha:1.0],
+				NSFontAttributeName: [NSFont systemFontOfSize:14]
+			}];
+		[[searchField cell] setPlaceholderAttributedString:placeholder];
+		[placeholder release];
 		[searchField setFont:[NSFont systemFontOfSize:14]];
 		[searchField setDelegate:(id<NSTextFieldDelegate>)self];
 		[searchField setWantsLayer:YES];
