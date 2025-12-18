@@ -128,7 +128,9 @@ static const float searchFieldHeight = 24;
 		[[searchField cell] setPlaceholderString:@"Filter..."];
 		[searchField setFont:[NSFont systemFontOfSize:14]];
 		[searchField setDelegate:(id<NSTextFieldDelegate>)self];
+		[searchField setWantsLayer:YES];
 		searchField.layer.cornerRadius = 4.0;
+		[searchField.layer setMasksToBounds:YES];
 
 		[self setInitialFirstResponder:searchField];
 		return self;

@@ -65,7 +65,11 @@
         @"popUpAnimation",
         [NSNumber numberWithBool:YES],
         @"displayClippingSource",
+#ifdef SANDBOXING
         [NSNumber numberWithBool:NO],
+#else
+        [NSNumber numberWithBool:YES],
+#endif
         @"saveForgottenClippings",
 #ifdef SANDBOXING
         [NSNumber numberWithBool:NO],

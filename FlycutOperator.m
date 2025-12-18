@@ -32,7 +32,7 @@
 		@"rememberNum",
         [NSNumber numberWithInt:40],
         @"favoritesRememberNum",
-		[NSNumber numberWithInt:1],
+		[NSNumber numberWithInt:2],
 		@"savePreference",
         [NSDictionary dictionary],
         @"store",
