@@ -23,7 +23,8 @@
 #import <ApplicationServices/ApplicationServices.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import <ServiceManagement/ServiceManagement.h>
-// Include LLM implementation directly to avoid Xcode project modification
+// LLM integration - include implementation directly (avoids Xcode project modification)
+// See LLM/DESIGN.md for architecture rationale
 #import "LLM/ConchisLLM.h"
 #import "LLM/ConchisLLM.m"
 
@@ -1343,20 +1344,38 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 - (IBAction)setAPIKey:(id)sender {
     NSString *key = [apiKeyField stringValue];
     if (key && key.length > 0) {
-        [[ConchisLLM shared] setAPIKey:key];
+        [ConchisKeychain setAPIKey:key];
         [apiKeyField setStringValue:@""];
         [self updateAPIKeyStatus];
+
+        // Test connection in background
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            ConchisLLM *llm = [[ConchisLLM alloc] initWithAPIKey:key];
+            LLMResult *result = [llm testConnection];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (result.success) {
+                    [apiKeyStatusLabel setStringValue:@"API key verified and saved"];
+                } else {
+                    [apiKeyStatusLabel setStringValue:[NSString stringWithFormat:@"Warning: %@", result.error]];
+                    [apiKeyStatusLabel setTextColor:[NSColor orangeColor]];
+                }
+            });
+        });
     }
 }
 
 - (IBAction)clearAPIKey:(id)sender {
-    [[ConchisLLM shared] clearAPIKey];
+    [ConchisKeychain clearAPIKey];
     [self updateAPIKeyStatus];
 }
 
 - (void)updateAPIKeyStatus {
-    if ([[ConchisLLM shared] isConfigured]) {
-        [apiKeyStatusLabel setStringValue:@"API key is set (stored in Keychain)"];
+    ConchisLLM *llm = [[ConchisLLM alloc] init];
+    if (llm.isConfigured) {
+        LLMUsageStats *stats = llm.stats;
+        NSString *status = [NSString stringWithFormat:@"API key set | Today: %ld req | Month: $%.4f",
+                           (long)stats.requestsToday, stats.costThisMonth];
+        [apiKeyStatusLabel setStringValue:status];
         [apiKeyStatusLabel setTextColor:[NSColor colorWithCalibratedRed:0.2 green:0.6 blue:0.2 alpha:1.0]];
     } else {
         [apiKeyStatusLabel setStringValue:@"No API key configured"];

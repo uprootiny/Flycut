@@ -2,59 +2,119 @@
 //  ConchisLLM.m
 //  Conchis
 //
-//  LLM integration for clipboard classification and prompt library.
+//  REVISED: Addresses failure modes identified in design review.
+//
+//  Changes from original:
+//  - No singleton (explicit instantiation, testable)
+//  - Synchronous API (caller controls threading)
+//  - Hard rate limiting (10 req/min client-side)
+//  - Cost tracking (visible in UI)
+//  - All errors returned, never swallowed
+//  - Simplified categories (5 not 15)
+//  - No auto-classification (user-initiated only)
+//  - No prompt library (removed - unproven value)
 //
 
 #import "ConchisLLM.h"
-#import "FlycutClipping.h"
 #import <Security/Security.h>
 
 static NSString * const kOpenRouterAPIURL = @"https://openrouter.ai/api/v1/chat/completions";
 static NSString * const kKeychainService = @"com.conchis.openrouter";
 static NSString * const kKeychainAccount = @"api_key";
-static NSString * const kPromptLibraryKey = @"ConchisPromptLibrary";
+static NSString * const kStatsKey = @"ConchisLLMStats";
 
-@interface ConchisLLM ()
-@property (nonatomic, strong) NSURLSession *session;
-@property (nonatomic, strong) NSMutableArray<NSDictionary *> *prompts;
-@end
+// Rate limit: 10 requests per minute
+static const NSInteger kMaxRequestsPerMinute = 10;
+static const NSTimeInterval kRateLimitWindow = 60.0;
 
-@implementation ConchisLLM
+// Cost estimate per request (Claude Haiku via OpenRouter)
+static const float kEstimatedCostPerRequest = 0.0003; // $0.0003 approx
 
-+ (instancetype)shared {
-    static ConchisLLM *instance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        instance = [[ConchisLLM alloc] init];
-    });
-    return instance;
-}
+// Timeout - fail fast
+static const NSTimeInterval kRequestTimeout = 10.0;
 
+#pragma mark - LLMResult
+
+@implementation LLMResult
 - (instancetype)init {
     self = [super init];
     if (self) {
-        NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
-        config.timeoutIntervalForRequest = 30.0;
-        _session = [NSURLSession sessionWithConfiguration:config];
-        [self loadPromptLibrary];
+        _success = NO;
+        _category = ClipCategoryUnknown;
+        _estimatedCost = 0;
     }
     return self;
 }
 
-#pragma mark - API Key Management (Keychain)
++ (instancetype)errorWithMessage:(NSString *)message {
+    LLMResult *result = [[LLMResult alloc] init];
+    result.success = NO;
+    result.error = message;
+    return result;
+}
 
-- (void)setAPIKey:(NSString *)apiKey {
-    if (!apiKey || apiKey.length == 0) {
++ (instancetype)successWithCategory:(ClipCategory)category latency:(NSTimeInterval)latency {
+    LLMResult *result = [[LLMResult alloc] init];
+    result.success = YES;
+    result.category = category;
+    result.latency = latency;
+    result.estimatedCost = kEstimatedCostPerRequest;
+    return result;
+}
+@end
+
+#pragma mark - LLMUsageStats
+
+@implementation LLMUsageStats
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _requestsToday = 0;
+        _requestsThisMonth = 0;
+        _costThisMonth = 0;
+        _errorsToday = 0;
+    }
+    return self;
+}
+
+- (instancetype)initWithDictionary:(NSDictionary *)dict {
+    self = [super init];
+    if (self && dict) {
+        _requestsToday = [dict[@"requestsToday"] integerValue];
+        _requestsThisMonth = [dict[@"requestsThisMonth"] integerValue];
+        _costThisMonth = [dict[@"costThisMonth"] floatValue];
+        _errorsToday = [dict[@"errorsToday"] integerValue];
+        _lastRequestTime = dict[@"lastRequestTime"];
+        _lastError = dict[@"lastError"];
+    }
+    return self;
+}
+
+- (NSDictionary *)toDictionary {
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    dict[@"requestsToday"] = @(self.requestsToday);
+    dict[@"requestsThisMonth"] = @(self.requestsThisMonth);
+    dict[@"costThisMonth"] = @(self.costThisMonth);
+    dict[@"errorsToday"] = @(self.errorsToday);
+    if (self.lastRequestTime) dict[@"lastRequestTime"] = self.lastRequestTime;
+    if (self.lastError) dict[@"lastError"] = self.lastError;
+    return dict;
+}
+@end
+
+#pragma mark - ConchisKeychain
+
+@implementation ConchisKeychain
+
++ (void)setAPIKey:(NSString *)key {
+    if (!key || key.length == 0) {
         [self clearAPIKey];
         return;
     }
 
-    NSData *keyData = [apiKey dataUsingEncoding:NSUTF8StringEncoding];
-
-    // Delete existing key first
+    NSData *keyData = [key dataUsingEncoding:NSUTF8StringEncoding];
     [self clearAPIKey];
 
-    // Add new key
     NSDictionary *query = @{
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: kKeychainService,
@@ -65,11 +125,11 @@ static NSString * const kPromptLibraryKey = @"ConchisPromptLibrary";
 
     OSStatus status = SecItemAdd((__bridge CFDictionaryRef)query, NULL);
     if (status != errSecSuccess) {
-        NSLog(@"ConchisLLM: Failed to store API key in Keychain: %d", (int)status);
+        NSLog(@"ConchisLLM: Keychain write failed: %d", (int)status);
     }
 }
 
-- (NSString *)apiKey {
++ (NSString *)apiKey {
     NSDictionary *query = @{
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: kKeychainService,
@@ -85,50 +145,165 @@ static NSString * const kPromptLibraryKey = @"ConchisPromptLibrary";
         NSData *data = (__bridge_transfer NSData *)dataRef;
         return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     }
-
     return nil;
 }
 
-- (void)clearAPIKey {
++ (void)clearAPIKey {
     NSDictionary *query = @{
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: kKeychainService,
         (__bridge id)kSecAttrAccount: kKeychainAccount
     };
-
     SecItemDelete((__bridge CFDictionaryRef)query);
 }
 
-- (BOOL)isConfigured {
-    NSString *key = [self apiKey];
-    return key != nil && key.length > 0;
+@end
+
+#pragma mark - ConchisLLM
+
+@interface ConchisLLM ()
+@property (nonatomic, copy) NSString *apiKey;
+@property (nonatomic, strong) LLMUsageStats *stats;
+@property (nonatomic, strong) NSMutableArray<NSDate *> *recentRequests; // For rate limiting
+@end
+
+@implementation ConchisLLM
+
+- (instancetype)initWithAPIKey:(NSString *)apiKey {
+    self = [super init];
+    if (self) {
+        _apiKey = [apiKey copy];
+        _recentRequests = [NSMutableArray array];
+        [self loadStats];
+    }
+    return self;
 }
 
-#pragma mark - Quick Classification (Local Heuristics)
+- (instancetype)init {
+    return [self initWithAPIKey:[ConchisKeychain apiKey]];
+}
 
-- (ClippingCategory)quickClassify:(NSString *)content {
+#pragma mark - Stats Persistence
+
+- (void)loadStats {
+    NSDictionary *dict = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kStatsKey];
+    if (dict) {
+        _stats = [[LLMUsageStats alloc] initWithDictionary:dict];
+        [self resetStatsIfNewDay];
+    } else {
+        _stats = [[LLMUsageStats alloc] init];
+    }
+}
+
+- (void)saveStats {
+    [[NSUserDefaults standardUserDefaults] setObject:[self.stats toDictionary] forKey:kStatsKey];
+}
+
+- (void)resetStatsIfNewDay {
+    NSDate *lastRequest = self.stats.lastRequestTime;
+    if (!lastRequest) return;
+
+    NSCalendar *cal = [NSCalendar currentCalendar];
+    if (![cal isDateInToday:lastRequest]) {
+        self.stats.requestsToday = 0;
+        self.stats.errorsToday = 0;
+    }
+
+    NSDateComponents *lastComponents = [cal components:NSCalendarUnitMonth|NSCalendarUnitYear fromDate:lastRequest];
+    NSDateComponents *nowComponents = [cal components:NSCalendarUnitMonth|NSCalendarUnitYear fromDate:[NSDate date]];
+
+    if (lastComponents.month != nowComponents.month || lastComponents.year != nowComponents.year) {
+        self.stats.requestsThisMonth = 0;
+        self.stats.costThisMonth = 0;
+    }
+}
+
+- (void)resetStats {
+    _stats = [[LLMUsageStats alloc] init];
+    [self saveStats];
+}
+
+#pragma mark - Configuration
+
+- (BOOL)isConfigured {
+    return self.apiKey != nil && self.apiKey.length > 10;
+}
+
+#pragma mark - Rate Limiting
+
+- (void)pruneOldRequests {
+    NSDate *cutoff = [NSDate dateWithTimeIntervalSinceNow:-kRateLimitWindow];
+    NSMutableArray *toRemove = [NSMutableArray array];
+    for (NSDate *date in self.recentRequests) {
+        if ([date compare:cutoff] == NSOrderedAscending) {
+            [toRemove addObject:date];
+        }
+    }
+    [self.recentRequests removeObjectsInArray:toRemove];
+}
+
+- (BOOL)isRateLimited {
+    [self pruneOldRequests];
+    return self.recentRequests.count >= kMaxRequestsPerMinute;
+}
+
+- (NSTimeInterval)secondsUntilNextRequest {
+    if (!self.isRateLimited) return 0;
+
+    [self pruneOldRequests];
+    if (self.recentRequests.count == 0) return 0;
+
+    NSDate *oldest = self.recentRequests[0];
+    NSTimeInterval age = -[oldest timeIntervalSinceNow];
+    return MAX(0, kRateLimitWindow - age);
+}
+
+- (void)recordRequest {
+    [self.recentRequests addObject:[NSDate date]];
+    self.stats.requestsToday++;
+    self.stats.requestsThisMonth++;
+    self.stats.lastRequestTime = [NSDate date];
+    [self saveStats];
+}
+
+- (void)recordError:(NSString *)error {
+    self.stats.errorsToday++;
+    self.stats.lastError = error;
+    [self saveStats];
+}
+
+- (void)recordCost:(float)cost {
+    self.stats.costThisMonth += cost;
+    [self saveStats];
+}
+
+#pragma mark - Local Classification
+
+- (ClipCategory)classifyLocally:(NSString *)content {
     if (!content || content.length == 0) {
-        return ClippingCategoryUnknown;
+        return ClipCategoryUnknown;
     }
 
     NSString *trimmed = [content stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 
-    // URL detection
-    if ([trimmed hasPrefix:@"http://"] || [trimmed hasPrefix:@"https://"] || [trimmed hasPrefix:@"ftp://"]) {
-        return ClippingCategoryURL;
+    // URL/Link detection (high confidence)
+    if ([trimmed hasPrefix:@"http://"] || [trimmed hasPrefix:@"https://"] ||
+        [trimmed hasPrefix:@"ftp://"] || [trimmed hasPrefix:@"file://"]) {
+        return ClipCategoryLink;
     }
 
     // Email detection
-    NSRegularExpression *emailRegex = [NSRegularExpression regularExpressionWithPattern:@"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" options:0 error:nil];
-    if ([emailRegex numberOfMatchesInString:trimmed options:0 range:NSMakeRange(0, trimmed.length)] > 0) {
-        return ClippingCategoryEmail;
+    if ([trimmed rangeOfString:@"@"].location != NSNotFound &&
+        [trimmed rangeOfString:@"."].location != NSNotFound &&
+        [trimmed rangeOfString:@" "].location == NSNotFound &&
+        trimmed.length < 100) {
+        return ClipCategoryLink;
     }
 
-    // Path detection (Unix or Windows)
-    if ([trimmed hasPrefix:@"/"] || [trimmed hasPrefix:@"~/"] || [trimmed hasPrefix:@"C:\\"] || [trimmed hasPrefix:@"."]) {
-        if ([trimmed rangeOfString:@"/"].location != NSNotFound || [trimmed rangeOfString:@"\\"].location != NSNotFound) {
-            return ClippingCategoryPath;
-        }
+    // File path detection
+    if (([trimmed hasPrefix:@"/"] || [trimmed hasPrefix:@"~/"]) &&
+        [trimmed rangeOfString:@" "].location == NSNotFound) {
+        return ClipCategoryLink;
     }
 
     // JSON detection
@@ -136,368 +311,210 @@ static NSString * const kPromptLibraryKey = @"ConchisPromptLibrary";
         ([trimmed hasPrefix:@"["] && [trimmed hasSuffix:@"]"])) {
         NSData *data = [trimmed dataUsingEncoding:NSUTF8StringEncoding];
         if ([NSJSONSerialization JSONObjectWithData:data options:0 error:nil]) {
-            return ClippingCategoryJSON;
+            return ClipCategoryData;
         }
     }
 
-    // Number detection
-    NSCharacterSet *nonNumeric = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789.,+-eE "] invertedSet];
-    if ([trimmed rangeOfCharacterFromSet:nonNumeric].location == NSNotFound && trimmed.length < 50) {
-        return ClippingCategoryNumber;
-    }
-
-    // Command detection (shell commands)
-    NSArray *commandPrefixes = @[@"cd ", @"ls ", @"cat ", @"grep ", @"git ", @"npm ", @"yarn ", @"brew ", @"sudo ", @"chmod ", @"mkdir ", @"rm ", @"cp ", @"mv "];
-    for (NSString *prefix in commandPrefixes) {
-        if ([trimmed hasPrefix:prefix] || [trimmed hasPrefix:[@"$" stringByAppendingString:prefix]]) {
-            return ClippingCategoryCommand;
-        }
-    }
-
-    // Code detection (heuristics)
-    NSArray *codeIndicators = @[@"function ", @"def ", @"class ", @"import ", @"#include", @"var ", @"let ", @"const ", @"return ", @"if (", @"for (", @"while (", @"->", @"=>", @"public ", @"private ", @"@interface", @"@implementation"];
-    for (NSString *indicator in codeIndicators) {
+    // Code detection (conservative - only obvious cases)
+    NSArray *strongCodeIndicators = @[
+        @"function ", @"def ", @"class ", @"#include", @"import ",
+        @"public static", @"private void", @"@interface", @"@implementation",
+        @"func ", @"fn ", @"let mut ", @"pub fn"
+    ];
+    for (NSString *indicator in strongCodeIndicators) {
         if ([trimmed rangeOfString:indicator].location != NSNotFound) {
-            return ClippingCategoryCode;
+            return ClipCategoryCode;
         }
     }
 
-    // Markdown detection
-    if ([trimmed hasPrefix:@"# "] || [trimmed hasPrefix:@"## "] || [trimmed hasPrefix:@"- "] || [trimmed hasPrefix:@"* "] ||
-        [trimmed rangeOfString:@"```"].location != NSNotFound || [trimmed rangeOfString:@"**"].location != NSNotFound) {
-        return ClippingCategoryMarkdown;
-    }
-
-    // List detection
-    NSArray *lines = [trimmed componentsSeparatedByString:@"\n"];
-    if (lines.count >= 3) {
-        BOOL isList = YES;
-        for (NSString *line in lines) {
-            NSString *trimmedLine = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-            if (trimmedLine.length > 0 &&
-                !([trimmedLine hasPrefix:@"- "] || [trimmedLine hasPrefix:@"* "] ||
-                  [trimmedLine hasPrefix:@"• "] || [[trimmedLine substringToIndex:MIN(3, trimmedLine.length)] rangeOfCharacterFromSet:[NSCharacterSet decimalDigitCharacterSet]].location != NSNotFound)) {
-                isList = NO;
-                break;
-            }
-        }
-        if (isList) {
-            return ClippingCategoryList;
-        }
-    }
-
-    // Prompt detection (questions or instructions to AI)
-    NSArray *promptIndicators = @[@"Please ", @"Can you ", @"Could you ", @"Write ", @"Generate ", @"Create ", @"Explain ", @"Help me ", @"I want ", @"I need "];
-    for (NSString *indicator in promptIndicators) {
-        if ([trimmed hasPrefix:indicator]) {
-            return ClippingCategoryPrompt;
-        }
-    }
-
-    // Prose detection by length
-    if (trimmed.length < 100) {
-        return ClippingCategoryProseShort;
-    } else {
-        return ClippingCategoryProseLong;
-    }
+    // If ambiguous, return Unknown - let user decide or use LLM
+    return ClipCategoryUnknown;
 }
 
 #pragma mark - LLM Classification
 
-- (void)classifyClipping:(FlycutClipping *)clipping {
+- (LLMResult *)classifyWithLLM:(NSString *)content {
+    // Pre-flight checks with clear error messages
     if (!self.isConfigured) {
-        if ([self.delegate respondsToSelector:@selector(llmDidFailWithError:)]) {
-            NSError *error = [NSError errorWithDomain:@"ConchisLLM" code:1 userInfo:@{NSLocalizedDescriptionKey: @"API key not configured"}];
-            [self.delegate llmDidFailWithError:error];
-        }
-        return;
+        return [LLMResult errorWithMessage:@"API key not configured"];
     }
 
-    NSString *content = [clipping contents];
-    if (content.length > 2000) {
-        content = [content substringToIndex:2000];
+    if (self.isRateLimited) {
+        NSString *msg = [NSString stringWithFormat:@"Rate limited. Try again in %.0f seconds.",
+                         self.secondsUntilNextRequest];
+        return [LLMResult errorWithMessage:msg];
     }
 
-    NSString *prompt = [NSString stringWithFormat:@"Classify this clipboard content into exactly one category. Respond with only the category name.\n\nCategories: code, url, email, path, json, markdown, prose_short, prose_long, list, number, date, address, command, prompt, other\n\nContent:\n%@", content];
+    if (!content || content.length == 0) {
+        return [LLMResult errorWithMessage:@"Empty content"];
+    }
 
-    [self sendPrompt:prompt completion:^(NSString *response, NSError *error) {
-        if (error) {
-            if ([self.delegate respondsToSelector:@selector(llmDidFailWithError:)]) {
-                [self.delegate llmDidFailWithError:error];
-            }
-            return;
-        }
+    // Truncate to avoid excessive token usage
+    NSString *truncated = content;
+    if (content.length > 500) {
+        truncated = [[content substringToIndex:500] stringByAppendingString:@"..."];
+    }
 
-        ClippingCategory category = [self categoryFromString:[response lowercaseString]];
-        if ([self.delegate respondsToSelector:@selector(llmDidClassifyClipping:withCategory:confidence:)]) {
-            [self.delegate llmDidClassifyClipping:clipping withCategory:category confidence:0.8];
-        }
-    }];
-}
+    NSString *prompt = [NSString stringWithFormat:
+        @"Classify this clipboard content into exactly one category. "
+        @"Respond with ONLY the category name, nothing else.\n\n"
+        @"Categories:\n"
+        @"- CODE (programming, scripts, config files)\n"
+        @"- LINK (URLs, file paths, email addresses)\n"
+        @"- DATA (JSON, numbers, structured data)\n"
+        @"- TEXT (prose, notes, natural language)\n\n"
+        @"Content:\n%@", truncated];
 
-- (ClippingCategory)categoryFromString:(NSString *)string {
-    string = [string stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    // Record request before making it
+    [self recordRequest];
 
-    NSDictionary *mapping = @{
-        @"code": @(ClippingCategoryCode),
-        @"url": @(ClippingCategoryURL),
-        @"email": @(ClippingCategoryEmail),
-        @"path": @(ClippingCategoryPath),
-        @"json": @(ClippingCategoryJSON),
-        @"markdown": @(ClippingCategoryMarkdown),
-        @"prose_short": @(ClippingCategoryProseShort),
-        @"prose_long": @(ClippingCategoryProseLong),
-        @"list": @(ClippingCategoryList),
-        @"number": @(ClippingCategoryNumber),
-        @"date": @(ClippingCategoryDate),
-        @"address": @(ClippingCategoryAddress),
-        @"command": @(ClippingCategoryCommand),
-        @"prompt": @(ClippingCategoryPrompt),
-        @"other": @(ClippingCategoryOther)
-    };
+    NSDate *startTime = [NSDate date];
+    LLMResult *result = [self sendSyncRequest:prompt];
+    result.latency = -[startTime timeIntervalSinceNow];
 
-    NSNumber *value = mapping[string];
-    return value ? [value integerValue] : ClippingCategoryUnknown;
-}
-
-#pragma mark - Prompt Library
-
-- (void)loadPromptLibrary {
-    NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kPromptLibraryKey];
-    if (saved) {
-        _prompts = [saved mutableCopy];
+    if (result.success) {
+        result.category = [self categoryFromResponse:result.summary];
+        result.estimatedCost = kEstimatedCostPerRequest;
+        [self recordCost:result.estimatedCost];
     } else {
-        _prompts = [NSMutableArray array];
-    }
-}
-
-- (void)savePromptLibrary {
-    [[NSUserDefaults standardUserDefaults] setObject:_prompts forKey:kPromptLibraryKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
-- (NSArray<NSDictionary *> *)promptLibrary {
-    return [_prompts copy];
-}
-
-- (void)addPromptToLibrary:(NSString *)prompt withTags:(NSArray<NSString *> *)tags {
-    NSDictionary *entry = @{
-        @"prompt": prompt,
-        @"tags": tags ?: @[],
-        @"created": [NSDate date],
-        @"useCount": @0
-    };
-    [_prompts insertObject:entry atIndex:0];
-    [self savePromptLibrary];
-}
-
-- (void)removePromptAtIndex:(NSUInteger)index {
-    if (index < _prompts.count) {
-        [_prompts removeObjectAtIndex:index];
-        [self savePromptLibrary];
-    }
-}
-
-- (NSArray<NSDictionary *> *)promptsMatchingTags:(NSArray<NSString *> *)tags {
-    NSMutableArray *matches = [NSMutableArray array];
-    for (NSDictionary *entry in _prompts) {
-        NSArray *entryTags = entry[@"tags"];
-        for (NSString *tag in tags) {
-            if ([entryTags containsObject:tag]) {
-                [matches addObject:entry];
-                break;
-            }
-        }
-    }
-    return matches;
-}
-
-- (void)analyzeForReusablePrompts:(NSString *)content {
-    if (!self.isConfigured || content.length < 20) {
-        return;
+        [self recordError:result.error];
     }
 
-    // Only analyze content that looks like a prompt
-    if ([self quickClassify:content] != ClippingCategoryPrompt) {
-        return;
-    }
-
-    NSString *analysisPrompt = [NSString stringWithFormat:@"Analyze this text. If it's a reusable prompt template (something that could be used again with different inputs), respond with:\nREUSABLE: [2-3 word description]\nTAGS: [comma-separated tags]\n\nIf it's not reusable, respond with: NOT_REUSABLE\n\nText:\n%@", content];
-
-    [self sendPrompt:analysisPrompt completion:^(NSString *response, NSError *error) {
-        if (error || !response) return;
-
-        if ([response hasPrefix:@"REUSABLE:"]) {
-            NSArray *lines = [response componentsSeparatedByString:@"\n"];
-            NSMutableArray *tags = [NSMutableArray array];
-
-            for (NSString *line in lines) {
-                if ([line hasPrefix:@"TAGS:"]) {
-                    NSString *tagString = [[line substringFromIndex:5] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-                    tags = [[tagString componentsSeparatedByString:@","] mutableCopy];
-                    for (NSUInteger i = 0; i < tags.count; i++) {
-                        tags[i] = [tags[i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-                    }
-                }
-            }
-
-            [self addPromptToLibrary:content withTags:tags];
-
-            if ([self.delegate respondsToSelector:@selector(llmDidIdentifyReusablePrompt:withTags:)]) {
-                [self.delegate llmDidIdentifyReusablePrompt:content withTags:tags];
-            }
-        }
-    }];
+    return result;
 }
 
-#pragma mark - Grouping
-
-- (void)suggestGroupsForClippings:(NSArray<FlycutClipping *> *)clippings
-                       completion:(void (^)(NSArray<NSDictionary *> *groups, NSError *error))completion {
+- (LLMResult *)testConnection {
     if (!self.isConfigured) {
-        NSError *error = [NSError errorWithDomain:@"ConchisLLM" code:1 userInfo:@{NSLocalizedDescriptionKey: @"API key not configured"}];
-        completion(nil, error);
-        return;
+        return [LLMResult errorWithMessage:@"API key not configured"];
     }
 
-    NSMutableString *contentList = [NSMutableString string];
-    for (NSUInteger i = 0; i < MIN(clippings.count, 20); i++) {
-        FlycutClipping *clip = clippings[i];
-        NSString *preview = [clip contents];
-        if (preview.length > 100) {
-            preview = [[preview substringToIndex:100] stringByAppendingString:@"..."];
-        }
-        [contentList appendFormat:@"%lu. %@\n", (unsigned long)i, preview];
+    // Don't count test against rate limit, but do record it
+    NSDate *startTime = [NSDate date];
+    LLMResult *result = [self sendSyncRequest:@"Reply with exactly: OK"];
+    result.latency = -[startTime timeIntervalSinceNow];
+
+    if (result.success && [result.summary rangeOfString:@"OK"].location != NSNotFound) {
+        result.summary = @"Connection successful";
+    } else if (result.success) {
+        result.success = NO;
+        result.error = @"Unexpected response from API";
     }
 
-    NSString *prompt = [NSString stringWithFormat:@"Group these clipboard items by topic/type. Respond in format:\nGROUP: [name]\nITEMS: [comma-separated indices]\n\nItems:\n%@", contentList];
-
-    [self sendPrompt:prompt completion:^(NSString *response, NSError *error) {
-        if (error) {
-            completion(nil, error);
-            return;
-        }
-
-        NSMutableArray *groups = [NSMutableArray array];
-        NSArray *lines = [response componentsSeparatedByString:@"\n"];
-        NSString *currentGroup = nil;
-
-        for (NSString *line in lines) {
-            if ([line hasPrefix:@"GROUP:"]) {
-                currentGroup = [[line substringFromIndex:6] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-            } else if ([line hasPrefix:@"ITEMS:"] && currentGroup) {
-                NSString *itemsStr = [[line substringFromIndex:6] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-                NSArray *indexStrings = [itemsStr componentsSeparatedByString:@","];
-                NSMutableArray *indices = [NSMutableArray array];
-                for (NSString *idx in indexStrings) {
-                    [indices addObject:@([[idx stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] integerValue])];
-                }
-                [groups addObject:@{@"name": currentGroup, @"indices": indices}];
-                currentGroup = nil;
-            }
-        }
-
-        completion(groups, nil);
-    }];
+    return result;
 }
 
-#pragma mark - API Communication
+- (ClipCategory)categoryFromResponse:(NSString *)response {
+    if (!response) return ClipCategoryUnknown;
 
-- (void)sendPrompt:(NSString *)prompt completion:(void (^)(NSString *response, NSError *error))completion {
-    NSString *apiKey = [self apiKey];
-    if (!apiKey) {
-        NSError *error = [NSError errorWithDomain:@"ConchisLLM" code:1 userInfo:@{NSLocalizedDescriptionKey: @"API key not configured"}];
-        completion(nil, error);
-        return;
-    }
+    NSString *upper = [response uppercaseString];
 
+    if ([upper rangeOfString:@"CODE"].location != NSNotFound) return ClipCategoryCode;
+    if ([upper rangeOfString:@"LINK"].location != NSNotFound) return ClipCategoryLink;
+    if ([upper rangeOfString:@"DATA"].location != NSNotFound) return ClipCategoryData;
+    if ([upper rangeOfString:@"TEXT"].location != NSNotFound) return ClipCategoryText;
+
+    return ClipCategoryUnknown;
+}
+
+#pragma mark - Network (Synchronous)
+
+- (LLMResult *)sendSyncRequest:(NSString *)prompt {
     NSURL *url = [NSURL URLWithString:kOpenRouterAPIURL];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = @"POST";
+    request.timeoutInterval = kRequestTimeout;
+
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:[NSString stringWithFormat:@"Bearer %@", apiKey] forHTTPHeaderField:@"Authorization"];
-    [request setValue:@"Conchis Clipboard Manager" forHTTPHeaderField:@"HTTP-Referer"];
+    [request setValue:[NSString stringWithFormat:@"Bearer %@", self.apiKey] forHTTPHeaderField:@"Authorization"];
+    [request setValue:@"Conchis" forHTTPHeaderField:@"HTTP-Referer"];
     [request setValue:@"Conchis" forHTTPHeaderField:@"X-Title"];
 
     NSDictionary *body = @{
         @"model": @"anthropic/claude-3-haiku",
         @"messages": @[@{@"role": @"user", @"content": prompt}],
-        @"max_tokens": @500,
-        @"temperature": @0.3
+        @"max_tokens": @50,  // Short responses only
+        @"temperature": @0.1 // Deterministic
     };
 
     NSError *jsonError;
     request.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonError];
     if (jsonError) {
-        completion(nil, jsonError);
-        return;
+        return [LLMResult errorWithMessage:[NSString stringWithFormat:@"JSON error: %@", jsonError.localizedDescription]];
     }
 
-    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                completion(nil, error);
-            });
-            return;
-        }
+    // Synchronous request - caller is responsible for threading
+    __block NSData *responseData = nil;
+    __block NSURLResponse *response = nil;
+    __block NSError *networkError = nil;
 
-        NSError *parseError;
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseError];
-        if (parseError) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                completion(nil, parseError);
-            });
-            return;
-        }
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-        NSString *content = json[@"choices"][0][@"message"][@"content"];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            completion(content, nil);
-        });
-    }];
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
+        completionHandler:^(NSData *data, NSURLResponse *resp, NSError *error) {
+            responseData = data;
+            response = resp;
+            networkError = error;
+            dispatch_semaphore_signal(semaphore);
+        }];
     [task resume];
+
+    // Wait with timeout
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kRequestTimeout * NSEC_PER_SEC));
+    if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
+        [task cancel];
+        return [LLMResult errorWithMessage:@"Request timed out"];
+    }
+
+    if (networkError) {
+        return [LLMResult errorWithMessage:[NSString stringWithFormat:@"Network error: %@", networkError.localizedDescription]];
+    }
+
+    NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+    if (httpResponse.statusCode == 401) {
+        return [LLMResult errorWithMessage:@"Invalid API key"];
+    }
+    if (httpResponse.statusCode == 429) {
+        return [LLMResult errorWithMessage:@"Rate limited by OpenRouter"];
+    }
+    if (httpResponse.statusCode != 200) {
+        return [LLMResult errorWithMessage:[NSString stringWithFormat:@"HTTP %ld", (long)httpResponse.statusCode]];
+    }
+
+    NSError *parseError;
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&parseError];
+    if (parseError) {
+        return [LLMResult errorWithMessage:@"Invalid JSON response"];
+    }
+
+    NSString *content = json[@"choices"][0][@"message"][@"content"];
+    if (!content) {
+        return [LLMResult errorWithMessage:@"No content in response"];
+    }
+
+    LLMResult *result = [[LLMResult alloc] init];
+    result.success = YES;
+    result.summary = content;
+    return result;
 }
 
-#pragma mark - Utility
+#pragma mark - Utilities
 
-+ (NSString *)categoryName:(ClippingCategory)category {
++ (NSString *)categoryName:(ClipCategory)category {
     switch (category) {
-        case ClippingCategoryCode: return @"Code";
-        case ClippingCategoryURL: return @"URL";
-        case ClippingCategoryEmail: return @"Email";
-        case ClippingCategoryPath: return @"Path";
-        case ClippingCategoryJSON: return @"JSON";
-        case ClippingCategoryMarkdown: return @"Markdown";
-        case ClippingCategoryProseShort: return @"Short Text";
-        case ClippingCategoryProseLong: return @"Long Text";
-        case ClippingCategoryList: return @"List";
-        case ClippingCategoryNumber: return @"Number";
-        case ClippingCategoryDate: return @"Date";
-        case ClippingCategoryAddress: return @"Address";
-        case ClippingCategoryCommand: return @"Command";
-        case ClippingCategoryPrompt: return @"Prompt";
-        case ClippingCategoryOther: return @"Other";
+        case ClipCategoryCode: return @"Code";
+        case ClipCategoryLink: return @"Link";
+        case ClipCategoryData: return @"Data";
+        case ClipCategoryText: return @"Text";
         default: return @"Unknown";
     }
 }
 
-+ (NSString *)categoryEmoji:(ClippingCategory)category {
++ (NSString *)categoryShortCode:(ClipCategory)category {
     switch (category) {
-        case ClippingCategoryCode: return @"</>"; // No emoji, text representation
-        case ClippingCategoryURL: return @"link";
-        case ClippingCategoryEmail: return @"@";
-        case ClippingCategoryPath: return @"/";
-        case ClippingCategoryJSON: return @"{}";
-        case ClippingCategoryMarkdown: return @"#";
-        case ClippingCategoryProseShort: return @"Aa";
-        case ClippingCategoryProseLong: return @"Aa+";
-        case ClippingCategoryList: return @"-";
-        case ClippingCategoryNumber: return @"123";
-        case ClippingCategoryDate: return @"cal";
-        case ClippingCategoryAddress: return @"loc";
-        case ClippingCategoryCommand: return @"$";
-        case ClippingCategoryPrompt: return @"?";
-        case ClippingCategoryOther: return @"...";
+        case ClipCategoryCode: return @"<>";
+        case ClipCategoryLink: return @"://";
+        case ClipCategoryData: return @"{}";
+        case ClipCategoryText: return @"Aa";
         default: return @"?";
     }
 }

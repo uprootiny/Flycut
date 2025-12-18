@@ -2,71 +2,85 @@
 //  ConchisLLM.h
 //  Conchis
 //
-//  LLM integration for clipboard classification and prompt library.
-//  Uses OpenRouter API for model access.
+//  REVISED DESIGN: Simple, bounded, fail-visible LLM integration.
+//
+//  Principles:
+//  - User-initiated only (no automatic API calls)
+//  - All errors visible in UI
+//  - Hard rate limits enforced client-side
+//  - Cost tracked and displayed
+//  - No singletons, explicit instantiation
 //
 
 #import <Foundation/Foundation.h>
 
-@class FlycutClipping;
-
-// Classification categories for clipboard content
-typedef NS_ENUM(NSInteger, ClippingCategory) {
-    ClippingCategoryUnknown = 0,
-    ClippingCategoryCode,
-    ClippingCategoryURL,
-    ClippingCategoryEmail,
-    ClippingCategoryPath,
-    ClippingCategoryJSON,
-    ClippingCategoryMarkdown,
-    ClippingCategoryProseShort,
-    ClippingCategoryProseLong,
-    ClippingCategoryList,
-    ClippingCategoryNumber,
-    ClippingCategoryDate,
-    ClippingCategoryAddress,
-    ClippingCategoryCommand,
-    ClippingCategoryPrompt,
-    ClippingCategoryOther
+// Simplified categories - only 5, not 15
+typedef NS_ENUM(NSInteger, ClipCategory) {
+    ClipCategoryUnknown = 0,
+    ClipCategoryCode,      // Programming code, scripts, config
+    ClipCategoryLink,      // URLs, file paths, email addresses
+    ClipCategoryData,      // JSON, numbers, structured data
+    ClipCategoryText,      // Prose, notes, natural language
 };
 
-// Delegate for async classification results
-@protocol ConchisLLMDelegate <NSObject>
-@optional
-- (void)llmDidClassifyClipping:(FlycutClipping *)clipping withCategory:(ClippingCategory)category confidence:(float)confidence;
-- (void)llmDidFailWithError:(NSError *)error;
-- (void)llmDidIdentifyReusablePrompt:(NSString *)prompt withTags:(NSArray<NSString *> *)tags;
+// Result object - not a delegate callback
+@interface LLMResult : NSObject
+@property (nonatomic, assign) BOOL success;
+@property (nonatomic, copy) NSString *error;         // nil if success
+@property (nonatomic, assign) ClipCategory category; // if classification
+@property (nonatomic, copy) NSString *summary;       // if summarization
+@property (nonatomic, assign) NSTimeInterval latency;
+@property (nonatomic, assign) float estimatedCost;   // in USD
+@end
+
+// Usage stats - for display in preferences
+@interface LLMUsageStats : NSObject
+@property (nonatomic, assign) NSInteger requestsToday;
+@property (nonatomic, assign) NSInteger requestsThisMonth;
+@property (nonatomic, assign) float costThisMonth;   // estimated USD
+@property (nonatomic, assign) NSInteger errorsToday;
+@property (nonatomic, strong) NSDate *lastRequestTime;
+@property (nonatomic, copy) NSString *lastError;
 @end
 
 @interface ConchisLLM : NSObject
 
-@property (nonatomic, weak) id<ConchisLLMDelegate> delegate;
+// Explicit init - no singleton
+- (instancetype)initWithAPIKey:(NSString *)apiKey;
+
+// Check if ready (has valid-looking key)
 @property (nonatomic, readonly) BOOL isConfigured;
 
-+ (instancetype)shared;
+// Rate limit status
+@property (nonatomic, readonly) BOOL isRateLimited;
+@property (nonatomic, readonly) NSTimeInterval secondsUntilNextRequest;
 
-// API Key management (stored in Keychain)
-- (void)setAPIKey:(NSString *)apiKey;
-- (NSString *)apiKey;
-- (void)clearAPIKey;
+// Usage stats
+@property (nonatomic, readonly) LLMUsageStats *stats;
 
-// Classification
-- (void)classifyClipping:(FlycutClipping *)clipping;
-- (ClippingCategory)quickClassify:(NSString *)content; // Local heuristics, no API call
+// Local classification - instant, free, no network
+// Returns ClipCategoryUnknown if ambiguous
+- (ClipCategory)classifyLocally:(NSString *)content;
 
-// Prompt library
-- (void)analyzeForReusablePrompts:(NSString *)content;
-- (NSArray<NSDictionary *> *)promptLibrary;
-- (void)addPromptToLibrary:(NSString *)prompt withTags:(NSArray<NSString *> *)tags;
-- (void)removePromptAtIndex:(NSUInteger)index;
-- (NSArray<NSDictionary *> *)promptsMatchingTags:(NSArray<NSString *> *)tags;
+// LLM classification - BLOCKING, call from background thread
+// Returns nil if rate limited or not configured
+- (LLMResult *)classifyWithLLM:(NSString *)content;
 
-// Grouping
-- (void)suggestGroupsForClippings:(NSArray<FlycutClipping *> *)clippings
-                       completion:(void (^)(NSArray<NSDictionary *> *groups, NSError *error))completion;
+// Test API key - BLOCKING
+- (LLMResult *)testConnection;
 
-// Utility
-+ (NSString *)categoryName:(ClippingCategory)category;
-+ (NSString *)categoryEmoji:(ClippingCategory)category;
+// Category utilities
++ (NSString *)categoryName:(ClipCategory)category;
++ (NSString *)categoryShortCode:(ClipCategory)category; // For bezel display
 
+// Reset stats (for testing)
+- (void)resetStats;
+
+@end
+
+// Keychain helper - separate concern
+@interface ConchisKeychain : NSObject
++ (void)setAPIKey:(NSString *)key;
++ (NSString *)apiKey;
++ (void)clearAPIKey;
 @end
