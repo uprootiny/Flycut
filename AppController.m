@@ -292,18 +292,21 @@
     else
     {
         // We need to do a little trick to get the search box functional.  Figure out what is currently active.
-        NSString *currRunningApp = @"";
         NSRunningApplication *currApp = nil;
+        BOOL weAreActive = NO;
         for (currApp in [[NSWorkspace sharedWorkspace] runningApplications])
             if ([currApp isActive])
             {
-                currRunningApp = [currApp localizedName];
+                // Check if we are the active app using bundle identifier (more reliable than name)
+                NSString *ourBundleId = [[NSBundle mainBundle] bundleIdentifier];
+                NSString *activeBundleId = [currApp bundleIdentifier];
+                weAreActive = (ourBundleId && activeBundleId && [ourBundleId isEqualToString:activeBundleId]);
                 break;
             }
 
-        if ( [currRunningApp rangeOfString:@"Conchis"].location == NSNotFound )
+        if ( !weAreActive )
         {
-            // We haven't activated Flycut yet.
+            // We haven't activated Conchis yet.
             currentRunningApplication = [currApp retain]; // Remember what app we came from.
             menuOpenEvent = [event retain]; // So we can send it again to open the menu.
             [menu cancelTracking]; // Prevent the menu from displaying, since activateIgnoringOtherApps would close it anyway.
@@ -312,7 +315,7 @@
         }
         else
         {
-            // Flycut is now active, so set the first responder once the menu opens.
+            // Conchis is now active, so set the first responder once the menu opens.
             [self performSelector:@selector(activateSearchBox) withObject:nil afterDelay:0.2 inModes:[NSArray arrayWithObject:NSRunLoopCommonModes]];
         }
     }
