@@ -129,7 +129,7 @@
     BOOL suppressAlert = [[NSUserDefaults standardUserDefaults] boolForKey:@"suppressAccessibilityAlert"];
     NSDictionary* options = @{(id) (kAXTrustedCheckOptionPrompt): @NO};
     if (!suppressAlert && AXIsProcessTrustedWithOptions != NULL && !AXIsProcessTrustedWithOptions((CFDictionaryRef) (options))) {
-        NSAlert *alert = [NSAlert alertWithMessageText:@"Flycut" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"For correct functioning of the app please tick Flycut in Accessibility apps list"];
+        NSAlert *alert = [NSAlert alertWithMessageText:@"Conchis" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"For correct functioning of the app please tick Conchis in Accessibility apps list"];
         alert.showsSuppressionButton = YES;
         [alert runModal];
         if (alert.suppressionButton.state == NSOnState) {
@@ -149,7 +149,7 @@
     if (ver.majorVersion == 10 && ver.minorVersion <= 13) {
         BOOL suppressAlert = [[NSUserDefaults standardUserDefaults] boolForKey:@"suppressOldOSXAlert"];
         if (!suppressAlert) {
-            NSAlert *alert = [NSAlert alertWithMessageText:@"Flycut" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"Unfortunatly due to some app sandbox security restrictions from Apple Flycut may not correctly function on MacOSX 10.13 or lower. You can download non sandboxed version here: https://github.com/TermiT/Flycut/releases"];
+            NSAlert *alert = [NSAlert alertWithMessageText:@"Conchis" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"Conchis is an unsigned build optimized for older macOS versions. If you experience issues, please report them at: https://github.com/uprootiny/Flycut/issues"];
             alert.showsSuppressionButton = YES;
             [alert runModal];
             if (alert.suppressionButton.state == NSOnState) {
@@ -301,7 +301,7 @@
                 break;
             }
 
-        if ( [currRunningApp rangeOfString:@"Flycut"].location == NSNotFound )
+        if ( [currRunningApp rangeOfString:@"Conchis"].location == NSNotFound )
         {
             // We haven't activated Flycut yet.
             currentRunningApplication = [currApp retain]; // Remember what app we came from.
