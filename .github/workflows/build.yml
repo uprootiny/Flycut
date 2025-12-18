@@ -39,6 +39,13 @@ jobs:
         sudo cp /tmp/libarclite_macosx.a "$ARC_DIR/"
         ls -la "$ARC_DIR"
 
+    - name: Generate icon from iconset
+      run: |
+        if [ -d "conchis.iconset" ]; then
+          iconutil -c icns conchis.iconset -o conchis.icns
+          ls -la conchis.icns
+        fi
+
     - name: List schemes and targets
       run: |
         xcodebuild -list -project Flycut.xcodeproj
