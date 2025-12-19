@@ -213,6 +213,19 @@
     [self switchMenuIconTo: [[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"]];
 	[statusItem setMenu:jcMenu];
     [jcMenu setDelegate:self];
+
+    // Add "Dump All Clippings" menu item programmatically
+    NSMenuItem *dumpItem = [[NSMenuItem alloc] initWithTitle:@"Dump All Clippings..."
+                                                      action:@selector(dumpAllClippings:)
+                                               keyEquivalent:@""];
+    [dumpItem setTarget:self];
+    // Insert before the last few items (Preferences, About, Quit)
+    int insertIndex = [[jcMenu itemArray] count] - 3;
+    if (insertIndex < 0) insertIndex = 0;
+    [jcMenu insertItem:dumpItem atIndex:insertIndex];
+    [jcMenu insertItem:[NSMenuItem separatorItem] atIndex:insertIndex + 1];
+    [dumpItem release];
+
     jcMenuBaseItemsCount = [[[[jcMenu itemArray] reverseObjectEnumerator] allObjects] count];
     [statusItem setEnabled:YES];
 
@@ -1437,6 +1450,98 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 -(IBAction)mergeClippingList:(id)sender {
     [flycutOperator mergeList];
     [self updateMenu];
+}
+
+-(IBAction)dumpAllClippings:(id)sender {
+    // Get all deduped clippings
+    NSArray *clippings = [flycutOperator allClippingsDeduped];
+
+    if ([clippings count] == 0) {
+        [NSApp activateIgnoringOtherApps:YES];
+        NSRunAlertPanel(@"Dump All Clippings",
+                        @"No clippings to dump.",
+                        @"OK", nil, nil);
+        return;
+    }
+
+    // Create timestamped folder name
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    [formatter setDateFormat:@"yyyy-MM-dd_HH-mm-ss"];
+    NSString *timestamp = [formatter stringFromDate:[NSDate date]];
+    [formatter release];
+
+    // Get base path - use saveToLocation preference or Desktop
+    NSString *basePath = nil;
+    NSURL *saveToLocation = [[NSUserDefaults standardUserDefaults] URLForKey:@"saveToLocation"];
+    if (saveToLocation) {
+        basePath = [saveToLocation path];
+    } else {
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDesktopDirectory, NSUserDomainMask, YES);
+        basePath = [paths objectAtIndex:0];
+    }
+
+    NSString *folderName = [NSString stringWithFormat:@"Conchis_Dump_%@", timestamp];
+    NSString *folderPath = [basePath stringByAppendingPathComponent:folderName];
+
+    // Create folder
+    NSError *error = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:folderPath
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:&error];
+    if (error) {
+        [NSApp activateIgnoringOtherApps:YES];
+        NSRunAlertPanel(@"Dump All Clippings",
+                        [NSString stringWithFormat:@"Failed to create folder: %@", error.localizedDescription],
+                        @"OK", nil, nil);
+        return;
+    }
+
+    // Save each clipping with timestamp and source info
+    NSDateFormatter *fileFormatter = [[NSDateFormatter alloc] init];
+    [fileFormatter setDateFormat:@"yyyy-MM-dd_HH-mm-ss"];
+
+    int savedCount = 0;
+    for (int i = 0; i < (int)[clippings count]; i++) {
+        FlycutClipping *clip = [clippings objectAtIndex:i];
+        NSString *contents = [clip contents];
+
+        // Create filename with timestamp if available
+        NSString *dateStr = @"unknown";
+        if ([clip timestamp] > 0) {
+            dateStr = [fileFormatter stringFromDate:[NSDate dateWithTimeIntervalSince1970:[clip timestamp]]];
+        }
+
+        NSString *appName = [clip appLocalizedName];
+        if (!appName) appName = @"unknown";
+        // Sanitize app name for filename
+        appName = [[appName componentsSeparatedByCharactersInSet:
+                   [[NSCharacterSet alphanumericCharacterSet] invertedSet]]
+                   componentsJoinedByString:@"_"];
+
+        NSString *fileName = [NSString stringWithFormat:@"%03d_%@_%@.txt", i + 1, dateStr, appName];
+        NSString *filePath = [folderPath stringByAppendingPathComponent:fileName];
+
+        error = nil;
+        [contents writeToFile:filePath
+                   atomically:YES
+                     encoding:NSUTF8StringEncoding
+                        error:&error];
+        if (!error) {
+            savedCount++;
+        }
+    }
+
+    [fileFormatter release];
+
+    // Show result
+    [NSApp activateIgnoringOtherApps:YES];
+    NSRunAlertPanel(@"Dump All Clippings",
+                    [NSString stringWithFormat:@"Saved %d clippings to:\n%@", savedCount, folderPath],
+                    @"OK", nil, nil);
+
+    // Open folder in Finder
+    [[NSWorkspace sharedWorkspace] selectFile:nil inFileViewerRootedAtPath:folderPath];
 }
 
 - (void)updateMenu {

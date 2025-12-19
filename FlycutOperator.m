@@ -1069,6 +1069,32 @@
     return [clippingStore clippingAtPosition:stackPosition];
 }
 
+-(FlycutClipping*)clippingAtIndex:(int)index
+{
+    if (index < 0 || index >= [clippingStore jcListCount]) {
+        return nil;
+    }
+    return [clippingStore clippingAtPosition:index];
+}
+
+-(NSArray*)allClippingsDeduped
+{
+    NSMutableArray *result = [NSMutableArray array];
+    NSMutableSet *seenContents = [NSMutableSet set];
+
+    int count = [clippingStore jcListCount];
+    for (int i = 0; i < count; i++) {
+        FlycutClipping *clip = [clippingStore clippingAtPosition:i];
+        NSString *contents = [clip contents];
+        if (contents && ![seenContents containsObject:contents]) {
+            [seenContents addObject:contents];
+            [result addObject:clip];
+        }
+    }
+
+    return result;
+}
+
 - (void)saveStore:(FlycutStore *)store toKey:(NSString *)key onDict:(NSMutableDictionary *)saveDict {
     NSMutableArray *jcListArray = [NSMutableArray array];
     for ( int i = 0 ; i < [store jcListCount] ; i++ )

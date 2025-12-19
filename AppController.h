@@ -100,6 +100,7 @@
 -(void) fakeCommandV;
 -(IBAction)clearClippingList:(id)sender;
 -(IBAction)mergeClippingList:(id)sender;
+-(IBAction)dumpAllClippings:(id)sender;
 -(void)controlTextDidChange:(NSNotification *)aNotification;
 -(BOOL)control:(NSControl *)control textView:(NSTextView *)fieldEditor doCommandBySelector:(SEL)commandSelector;
 -(IBAction)searchItems:(id)sender;

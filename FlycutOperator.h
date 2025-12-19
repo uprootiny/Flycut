@@ -98,6 +98,8 @@
 -(int)jcListCount;
 -(int)rememberNum;
 -(FlycutClipping*)clippingAtStackPosition;
+-(FlycutClipping*)clippingAtIndex:(int)index;
+-(NSArray*)allClippingsDeduped;
 -(NSArray *) previousDisplayStrings:(int)howMany containing:(NSString*)search;
 -(NSArray *) previousIndexes:(int)howMany containing:(NSString*)search; // This method is in newest-first order.
 -(void)setDisableStoreTo:(bool) value;
