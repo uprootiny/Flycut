@@ -1,0 +1,2261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ancient Sounds - Medieval & Ancient Music Explorer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+  <style>
+/* Reset & Variables */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-0: #0a0a0f;
+  --bg-1: #12121a;
+  --bg-2: #1a1a24;
+  --bg-3: #24242e;
+  --text-0: #f0f0f5;
+  --text-1: #b0b0c0;
+  --text-2: #707080;
+  --accent: #c9a227;
+  --accent-dim: #a68520;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --border: #2a2a38;
+  --font: system-ui, -apple-system, sans-serif;
+  --mono: 'SF Mono', Consolas, monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-0);
+  color: var(--text-0);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-1); }
+::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+
+/* Layout */
+.app {
+  display: grid;
+  grid-template: auto 1fr / 240px 1fr 260px;
+  min-height: 100vh;
+  padding-bottom: 80px; /* Space for fixed player */
+}
+.header { grid-column: 1 / -1; }
+
+/* Header */
+.header {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.search-form {
+  flex: 1;
+  max-width: 500px;
+  display: flex;
+  position: relative;
+}
+.search-input {
+  flex: 1;
+  padding: 10px 16px 10px 40px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-0);
+  font-size: 14px;
+}
+.search-input::placeholder { color: var(--text-2); }
+.search-input:focus { border-color: var(--accent); }
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-2);
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  margin-left: auto;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.status-dot.stale { background: var(--warning); }
+.status-dot.error { background: var(--error); }
+
+/* Sidebar */
+.sidebar {
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  padding: 12px 0;
+  overflow-y: auto;
+}
+.sidebar-section { margin-bottom: 12px; }
+.sidebar-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+  padding: 4px 12px;
+  margin-bottom: 2px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-1);
+  z-index: 1;
+}
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--text-1);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-btn:hover { background: var(--bg-2); color: var(--text-0); }
+.nav-btn.active { background: var(--bg-2); color: var(--accent); border-left-color: var(--accent); }
+.nav-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+
+/* Main */
+.main {
+  padding: 20px;
+  overflow-y: auto;
+}
+.content-header { margin-bottom: 20px; }
+.content-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.content-meta { font-size: 13px; color: var(--text-2); }
+
+/* Grid */
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+.item-card {
+  background: var(--bg-1);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.item-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.item-cover {
+  aspect-ratio: 1;
+  background: var(--bg-2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-cover img { width: 100%; height: 100%; object-fit: cover; }
+.item-fallback { font-size: 40px; opacity: 0.3; }
+.item-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.6);
+  opacity: 0;
+  transition: opacity 0.15s;
+  border: none;
+  cursor: pointer;
+}
+.item-card:hover .item-play { opacity: 1; }
+.item-play span {
+  width: 44px;
+  height: 44px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: white;
+}
+.item-info { padding: 12px; }
+.item-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.item-artist {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* States */
+.state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+.state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+.state-title { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+.state-text { color: var(--text-2); max-width: 300px; margin-bottom: 16px; }
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-dim); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: var(--bg-2); color: var(--text-0); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-3); }
+.btn-small { padding: 6px 12px; font-size: 11px; }
+.btn-icon { width: 28px; height: 28px; padding: 0; border-radius: 6px; font-size: 14px; }
+
+/* LLM Refinement Toolbar */
+.refine-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.refine-toolbar-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+  margin-right: 8px;
+}
+.refine-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-1);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.refine-btn:hover { background: var(--bg-1); color: var(--text-0); border-color: var(--accent); }
+.refine-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.refine-btn.loading { pointer-events: none; }
+.refine-btn .icon { font-size: 14px; }
+.refine-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Generated Topics Panel */
+.topics-panel {
+  margin-bottom: 20px;
+}
+.topics-section {
+  margin-bottom: 16px;
+}
+.topics-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.topics-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.topics-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.topic-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.topic-chip:hover { background: var(--bg-3); border-color: var(--accent); color: var(--text-0); }
+.topic-chip .icon { font-size: 14px; }
+.topic-chip .save-btn {
+  opacity: 0;
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.topic-chip:hover .save-btn { opacity: 1; }
+.topic-chip .save-btn:hover { color: var(--accent); }
+.topic-reason {
+  font-size: 11px;
+  color: var(--text-2);
+  font-style: italic;
+  margin-left: 4px;
+}
+
+/* Favorites in Sidebar */
+.sidebar-fav { position: relative; }
+.sidebar-fav .fav-badge {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--accent);
+}
+
+/* Content Header with Favorite Button */
+.content-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fav-toggle {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.15s;
+}
+.fav-toggle:hover { opacity: 1; transform: scale(1.1); }
+.fav-toggle.active { opacity: 1; }
+
+/* Playlist Panel */
+.playlist {
+  background: var(--bg-1);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.playlist-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.playlist-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.playlist-name { font-size: 16px; font-weight: 600; }
+.playlist-stats { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+.playlist-tracks {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+.playlist-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  color: var(--text-0);
+}
+.playlist-track:hover { background: var(--bg-2); }
+.playlist-track.playing { background: var(--bg-3); }
+.track-num { font-family: var(--mono); font-size: 11px; color: var(--text-2); width: 18px; }
+.track-info { flex: 1; min-width: 0; }
+.track-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-artist { font-size: 11px; color: var(--text-2); }
+.track-duration { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.track-remove {
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  font-size: 14px;
+}
+.playlist-track:hover .track-remove { opacity: 1; }
+.track-remove:hover { background: var(--error); color: white; }
+.playlist-empty {
+  padding: 40px 16px;
+  text-align: center;
+}
+.playlist-empty-icon { font-size: 32px; opacity: 0.3; margin-bottom: 12px; }
+.playlist-empty-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.playlist-empty-text { font-size: 12px; color: var(--text-2); }
+.playlist-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+.playlist-footer .btn { flex: 1; }
+
+/* Player */
+.player {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-2);
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  display: grid;
+  grid-template-columns: 240px 1fr 180px;
+  align-items: center;
+  gap: 20px;
+  z-index: 200;
+}
+.player-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.player-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  background: var(--bg-1);
+  overflow: hidden;
+}
+.player-cover img { width: 100%; height: 100%; object-fit: cover; }
+.player-title { font-size: 13px; font-weight: 500; }
+.player-artist { font-size: 12px; color: var(--text-2); }
+.player-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.player-buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.player-btn {
+  background: none;
+  border: none;
+  color: var(--text-1);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px;
+}
+.player-btn:hover { color: var(--text-0); }
+.player-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.player-btn-main {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-btn-main:hover { background: var(--accent-dim); }
+.player-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 600px;
+}
+.player-time { font-family: var(--mono); font-size: 11px; color: var(--text-2); min-width: 36px; }
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-1);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.player-volume {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.volume-bar {
+  width: 80px;
+  height: 4px;
+  background: var(--bg-1);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.volume-fill { height: 100%; background: var(--text-2); border-radius: 2px; }
+.player-error { color: var(--error); font-size: 12px; text-align: center; }
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+.toast {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  font-size: 14px;
+}
+
+/* Log Panel */
+.log-toggle {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-1);
+  cursor: pointer;
+  z-index: 50;
+}
+.log-panel {
+  position: fixed;
+  bottom: 150px;
+  right: 20px;
+  width: 500px;
+  max-height: 300px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 50;
+  display: none;
+}
+.log-panel.open { display: block; }
+.log-header {
+  padding: 8px 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+.log-content {
+  height: 250px;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.log-entry { padding: 2px 0; }
+.log-entry.error { color: var(--error); }
+.log-entry.warn { color: var(--warning); }
+.log-entry.info { color: var(--text-1); }
+.log-entry.debug { color: var(--text-2); }
+
+/* Mobile Menu Toggle */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--text-1);
+}
+.mobile-playlist-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--text-1);
+  position: relative;
+}
+.mobile-playlist-btn .badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+}
+.sidebar-backdrop { display: none; }
+.sidebar-close { display: none; }
+.playlist-close { display: none; }
+
+/* Mobile Responsive */
+@media (max-width: 900px) {
+  .app {
+    grid-template: auto 1fr / 1fr;
+    padding-bottom: 70px;
+  }
+  
+  .mobile-menu-btn,
+  .mobile-playlist-btn { display: block; }
+  .sidebar-close,
+  .playlist-close { display: block; }
+  
+  /* Header mobile */
+  .header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .logo span { display: none; }
+  .logo-icon { font-size: 20px; }
+  .search-form { flex: 1; }
+  .search-input { font-size: 16px; } /* Prevent zoom on iOS */
+  .status { display: none; }
+  
+  /* Sidebar as overlay */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    padding-top: 60px;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 299;
+  }
+  .sidebar-backdrop.open { display: block; }
+  .sidebar-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-1);
+    cursor: pointer;
+  }
+  
+  /* Main content full width */
+  .main {
+    padding: 12px;
+    overflow-y: auto;
+  }
+  
+  /* Content header compact */
+  .content-header { margin-bottom: 12px; }
+  .content-title { font-size: 18px; }
+  
+  /* Refine toolbar scrollable */
+  .refine-toolbar {
+    padding: 10px 12px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px 12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .refine-toolbar::-webkit-scrollbar { display: none; }
+  .refine-toolbar-label { display: none; }
+  .refine-btn {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  
+  /* Topics panel */
+  .topics-panel { margin-bottom: 16px; }
+  .topics-grid { gap: 6px; }
+  .topic-chip {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .topic-reason { display: none; }
+  .topic-chip .save-btn { opacity: 1; }
+  
+  /* Item grid 2 columns */
+  .item-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .item-info { padding: 8px; }
+  .item-title { font-size: 12px; }
+  .item-artist { font-size: 11px; }
+  .item-play span {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  
+  /* Playlist as overlay */
+  .playlist {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 70px;
+    width: 300px;
+    z-index: 300;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+  }
+  .playlist.open {
+    transform: translateX(0);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  }
+  .playlist-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-1);
+    cursor: pointer;
+    z-index: 1;
+  }
+  
+  /* Player compact */
+  .player {
+    padding: 8px 12px;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .player::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    width: var(--progress, 0%);
+    transition: width 0.3s;
+  }
+  .player-track {
+    min-width: 0;
+  }
+  .player-cover { display: none; }
+  .player-title {
+    font-size: 13px;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .player-artist { display: none; }
+  .player-controls {
+    flex-direction: row;
+    gap: 8px;
+  }
+  .player-buttons { gap: 4px; }
+  .player-btn { width: 36px; height: 36px; font-size: 14px; }
+  .player-btn-main { width: 44px; height: 44px; font-size: 18px; }
+  .player-progress { display: none; }
+  .player-volume { display: none; }
+  
+  /* Toast higher */
+  .toast-container { bottom: 80px; }
+  
+  /* Log panel */
+  .log-toggle { bottom: 80px; right: 10px; width: 36px; height: 36px; }
+  .log-panel { left: 10px; right: 10px; bottom: 120px; }
+}
+
+/* Very small phones */
+@media (max-width: 380px) {
+  .item-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .refine-btn span:not(.icon) { display: none; }
+  .refine-btn .icon { margin: 0; }
+  .topic-chip { padding: 6px 10px; font-size: 12px; }
+  .player-title { max-width: 120px; }
+}
+  </style>
+</head>
+<body>
+  <div id="app" class="app">
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p class="state-text">Loading...</p>
+    </div>
+  </div>
+
+  <button class="log-toggle" id="log-toggle" title="Toggle Log">📋</button>
+  <div class="log-panel" id="log-panel">
+    <div class="log-header">
+      <span>Activity Log</span>
+      <button onclick="clearLog()" style="background:none;border:none;color:var(--text-2);cursor:pointer">Clear</button>
+    </div>
+    <div class="log-content" id="log-content"></div>
+  </div>
+
+  <script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════
+const CONFIG = {
+  api: { base: 'https://archive.org', search: '/advancedsearch.php', metadata: '/metadata', download: '/download', thumbnail: '/services/img' },
+  network: { timeoutMs: 30000, maxRetries: 3, retryBaseMs: 1000, retryableStatuses: [408, 429, 500, 502, 503, 504] },
+  cache: { freshTtlMs: 300000, staleTtlMs: 1800000, key: 'ia-playlist-v1' },
+  search: { rows: 60, sort: 'downloads desc', fields: ['identifier', 'title', 'creator', 'date', 'downloads', 'description'] },
+  audio: { formats: ['VBR MP3', 'MP3', 'Ogg Vorbis'], extensions: ['.mp3', '.ogg'], volume: 0.8 },
+  llm: {
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKey: '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',
+    model: 'anthropic/claude-3.5-haiku',
+  },
+  // Words that indicate non-music content to deprioritize
+  deprioritize: ['lecture', 'documentary', 'spoken', 'audiobook', 'interview', 'podcast', 'discussion', 'talk', 'speech', 'reading', 'commentary', 'analysis'],
+  // Minimum duration in seconds for "real" tracks
+  minDuration: 60,
+};
+
+// Smart sorting: prioritize actual music over lectures/snippets
+function smartSort(items) {
+  return items.map(item => {
+    let score = item.downloads || 0;
+    const title = (item.title || '').toLowerCase();
+    const desc = (item.description || '').toLowerCase();
+    const text = title + ' ' + desc;
+    
+    // Deprioritize non-music content
+    for (const word of CONFIG.deprioritize) {
+      if (text.includes(word)) score *= 0.1;
+    }
+    
+    // Boost items with musical indicators
+    if (text.includes('chant') || text.includes('music') || text.includes('song') || text.includes('hymn')) score *= 1.5;
+    if (text.includes('recording') || text.includes('performance') || text.includes('concert')) score *= 1.3;
+    
+    return { ...item, _score: score };
+  }).sort((a, b) => b._score - a._score);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COLLECTIONS - 300+ Research Threads
+// ═══════════════════════════════════════════════════════════════════
+const SECTIONS = [
+  { id: 'westernMedieval', title: '⚔️ Western Medieval', items: [
+    { id: 'medieval-survey', name: 'Medieval Survey', icon: '🏰', query: 'medieval music' },
+    { id: 'early-medieval', name: 'Early Medieval', icon: '📜', query: 'early medieval music OR carolingian' },
+    { id: 'high-medieval', name: 'High Medieval', icon: '⚔️', query: 'high medieval music OR 12th century music OR 13th century music' },
+    { id: 'late-medieval', name: 'Late Medieval', icon: '🏯', query: 'late medieval music OR 14th century music' },
+    { id: 'courtly-love', name: 'Courtly Love', icon: '💕', query: 'courtly love medieval OR amour courtois' },
+    { id: 'medieval-dance', name: 'Medieval Dance', icon: '💃', query: 'medieval dance music OR estampie OR saltarello' },
+  ]},
+  { id: 'gregorian', title: '✝️ Gregorian & Plainchant', items: [
+    { id: 'gregorian', name: 'Gregorian Chant', icon: '✝️', query: 'gregorian chant' },
+    { id: 'plainchant', name: 'Plainchant', icon: '📖', query: 'plainchant OR plainsong' },
+    { id: 'chant-mass', name: 'Chant Masses', icon: '⛪', query: 'chant mass OR missa gregorian' },
+    { id: 'divine-office', name: 'Divine Office', icon: '🕯️', query: 'divine office chant OR liturgy hours' },
+    { id: 'antiphons', name: 'Antiphons', icon: '🎵', query: 'antiphon chant OR antiphonal' },
+    { id: 'hymns-sequences', name: 'Hymns & Sequences', icon: '📜', query: 'gregorian hymn OR sequence medieval' },
+    { id: 'psalmody', name: 'Psalmody', icon: '📕', query: 'psalm chant OR psalter singing' },
+  ]},
+  { id: 'monastic', title: '🏛️ Monastic Traditions', items: [
+    { id: 'benedictine', name: 'Benedictine', icon: '⚫', query: 'benedictine chant OR benedictine monks' },
+    { id: 'cistercian', name: 'Cistercian', icon: '⚪', query: 'cistercian chant OR cistercian monks' },
+    { id: 'dominican', name: 'Dominican', icon: '🖤', query: 'dominican chant OR dominican liturgy' },
+    { id: 'franciscan', name: 'Franciscan', icon: '🤎', query: 'franciscan music OR lauda spirituale' },
+    { id: 'solesmes', name: 'Solesmes', icon: '🇫🇷', query: 'solesmes chant OR solesmes abbey' },
+    { id: 'fontgombault', name: 'Fontgombault', icon: '🔔', query: 'fontgombault abbey' },
+  ]},
+  { id: 'french', title: '🇫🇷 French Medieval', items: [
+    { id: 'troubadours', name: 'Troubadours', icon: '🎭', query: 'troubadour OR occitan song' },
+    { id: 'trouveres', name: 'Trouvères', icon: '🎪', query: 'trouvere OR adam de la halle' },
+    { id: 'notre-dame', name: 'Notre Dame School', icon: '⛪', query: 'notre dame school music OR leonin OR perotin' },
+    { id: 'ars-antiqua', name: 'Ars Antiqua', icon: '📖', query: 'ars antiqua OR organum' },
+    { id: 'ars-nova', name: 'Ars Nova', icon: '📕', query: 'ars nova OR machaut OR philippe de vitry' },
+    { id: 'ars-subtilior', name: 'Ars Subtilior', icon: '🎨', query: 'ars subtilior' },
+    { id: 'roman-fauvel', name: 'Roman de Fauvel', icon: '🐴', query: 'roman de fauvel' },
+  ]},
+  { id: 'italian', title: '🇮🇹 Italian Medieval', items: [
+    { id: 'trecento', name: 'Trecento', icon: '🎭', query: 'trecento music OR italian 14th century' },
+    { id: 'landini', name: 'Francesco Landini', icon: '👨‍🎤', query: 'landini' },
+    { id: 'lauda', name: 'Lauda Spirituale', icon: '🙏', query: 'lauda spirituale OR laude' },
+    { id: 'ballata', name: 'Ballata', icon: '💃', query: 'ballata medieval' },
+    { id: 'caccia', name: 'Caccia', icon: '🦌', query: 'caccia medieval' },
+  ]},
+  { id: 'iberian', title: '🇪🇸 Iberian Medieval', items: [
+    { id: 'cantigas', name: 'Cantigas de Santa Maria', icon: '👑', query: 'cantigas santa maria OR alfonso' },
+    { id: 'mozarabic', name: 'Mozarabic Chant', icon: '☪️', query: 'mozarabic chant OR hispanic rite' },
+    { id: 'sephardic-medieval', name: 'Sephardic Medieval', icon: '✡️', query: 'sephardic medieval OR ladino medieval' },
+    { id: 'catalan', name: 'Catalan Medieval', icon: '🏴', query: 'llibre vermell OR catalan medieval' },
+    { id: 'galician', name: 'Galician-Portuguese', icon: '🌊', query: 'galician portuguese lyric OR cantiga amigo' },
+  ]},
+  { id: 'german', title: '🇩🇪 Germanic Medieval', items: [
+    { id: 'minnesinger', name: 'Minnesinger', icon: '🎤', query: 'minnesinger OR minnesang' },
+    { id: 'walther', name: 'Walther von der Vogelweide', icon: '🐦', query: 'walther vogelweide' },
+    { id: 'meistersinger', name: 'Meistersinger', icon: '👨‍🎨', query: 'meistersinger' },
+    { id: 'carmina-burana', name: 'Carmina Burana', icon: '📚', query: 'carmina burana medieval OR goliard' },
+  ]},
+  { id: 'english', title: '🇬🇧 English Medieval', items: [
+    { id: 'english-medieval', name: 'English Medieval', icon: '🏰', query: 'english medieval music' },
+    { id: 'sarum-use', name: 'Sarum Use', icon: '⛪', query: 'sarum use OR sarum rite' },
+    { id: 'old-hall', name: 'Old Hall Manuscript', icon: '📜', query: 'old hall manuscript' },
+    { id: 'dunstable', name: 'John Dunstable', icon: '👨‍🎤', query: 'dunstable' },
+    { id: 'carol-medieval', name: 'Medieval Carol', icon: '🎄', query: 'medieval carol' },
+  ]},
+  { id: 'byzantine', title: '☦️ Byzantine', items: [
+    { id: 'byzantine-chant', name: 'Byzantine Chant', icon: '☦️', query: 'byzantine chant OR greek orthodox chant' },
+    { id: 'octoechos', name: 'Octoechos', icon: '8️⃣', query: 'octoechos OR byzantine modes' },
+    { id: 'kontakion', name: 'Kontakion', icon: '📜', query: 'kontakion OR romanos melodist' },
+    { id: 'cherubic-hymn', name: 'Cherubic Hymn', icon: '👼', query: 'cherubic hymn OR cherubikon' },
+    { id: 'athonite', name: 'Mount Athos', icon: '🏔️', query: 'mount athos chant' },
+  ]},
+  { id: 'slavic', title: '🇷🇺 Slavic Orthodox', items: [
+    { id: 'russian-orthodox', name: 'Russian Orthodox', icon: '🇷🇺', query: 'russian orthodox chant' },
+    { id: 'znamenny', name: 'Znamenny Chant', icon: '📜', query: 'znamenny chant' },
+    { id: 'kievan', name: 'Kievan Chant', icon: '🏰', query: 'kievan chant' },
+    { id: 'valaam', name: 'Valaam Monastery', icon: '🏝️', query: 'valaam monastery' },
+    { id: 'serbian-chant', name: 'Serbian Chant', icon: '🇷🇸', query: 'serbian orthodox chant' },
+    { id: 'bulgarian-chant', name: 'Bulgarian Chant', icon: '🇧🇬', query: 'bulgarian orthodox chant' },
+  ]},
+  { id: 'oriental', title: '✝️ Oriental Orthodox', items: [
+    { id: 'coptic', name: 'Coptic Chant', icon: '🇪🇬', query: 'coptic chant OR coptic liturgy' },
+    { id: 'ethiopian', name: 'Ethiopian Chant', icon: '🇪🇹', query: 'ethiopian orthodox chant' },
+    { id: 'armenian', name: 'Armenian Chant', icon: '🇦🇲', query: 'armenian liturgical music' },
+    { id: 'syriac', name: 'Syriac Chant', icon: '📿', query: 'syriac chant OR syrian orthodox' },
+    { id: 'maronite', name: 'Maronite', icon: '🇱🇧', query: 'maronite chant' },
+    { id: 'georgian', name: 'Georgian Polyphony', icon: '🇬🇪', query: 'georgian polyphony' },
+  ]},
+  { id: 'synagogue', title: '✡️ Synagogue Music', items: [
+    { id: 'jewish-liturgical', name: 'Jewish Liturgical', icon: '✡️', query: 'jewish liturgical music OR synagogue music' },
+    { id: 'cantorial', name: 'Cantorial Art', icon: '🎤', query: 'cantor chazzan OR cantorial' },
+    { id: 'nusach', name: 'Nusach', icon: '🎵', query: 'nusach prayer OR jewish prayer modes' },
+    { id: 'high-holy-days', name: 'High Holy Days', icon: '📯', query: 'high holy days music OR rosh hashanah yom kippur' },
+    { id: 'kol-nidre', name: 'Kol Nidre', icon: '📜', query: 'kol nidre' },
+  ]},
+  { id: 'jewishRegional', title: '🕎 Jewish Regional', items: [
+    { id: 'ashkenazi', name: 'Ashkenazi', icon: '🇩🇪', query: 'ashkenazi music' },
+    { id: 'sephardic', name: 'Sephardic', icon: '🇪🇸', query: 'sephardic music' },
+    { id: 'mizrachi', name: 'Mizrachi', icon: '🌅', query: 'mizrachi music OR middle eastern jewish' },
+    { id: 'yemenite', name: 'Yemenite', icon: '🇾🇪', query: 'yemenite jewish music' },
+    { id: 'ladino', name: 'Ladino Songs', icon: '🎭', query: 'ladino music OR judeo spanish' },
+    { id: 'moroccan-jewish', name: 'Moroccan Jewish', icon: '🇲🇦', query: 'moroccan jewish music' },
+  ]},
+  { id: 'jewishMystical', title: '🔯 Jewish Mystical', items: [
+    { id: 'kabbalah-music', name: 'Kabbalistic', icon: '🌳', query: 'kabbalah music OR kabbalistic' },
+    { id: 'hasidic', name: 'Hasidic Nigun', icon: '🎶', query: 'hasidic nigun OR chassidic' },
+    { id: 'chabad', name: 'Chabad', icon: '📚', query: 'chabad music OR lubavitch' },
+    { id: 'carlebach', name: 'Carlebach Style', icon: '🎸', query: 'carlebach OR shlomo carlebach' },
+    { id: 'piyyut', name: 'Piyyut', icon: '📜', query: 'piyyut liturgical poetry' },
+    { id: 'zemirot', name: 'Zemirot', icon: '🍷', query: 'zemirot OR sabbath table songs' },
+  ]},
+  { id: 'klezmer', title: '🎻 Klezmer & Yiddish', items: [
+    { id: 'klezmer', name: 'Klezmer', icon: '🎻', query: 'klezmer' },
+    { id: 'yiddish-song', name: 'Yiddish Song', icon: '🎤', query: 'yiddish song OR yiddish music' },
+    { id: 'yiddish-theater', name: 'Yiddish Theater', icon: '🎭', query: 'yiddish theater music' },
+  ]},
+  { id: 'quranic', title: '☪️ Quranic Arts', items: [
+    { id: 'quran-recitation', name: 'Quran Recitation', icon: '📖', query: 'quran recitation OR quranic' },
+    { id: 'tajwid', name: 'Tajwid', icon: '🎵', query: 'tajwid OR quran tajweed' },
+    { id: 'famous-qari', name: 'Famous Qaris', icon: '🎤', query: 'abdul basit OR minshawi quran' },
+    { id: 'adhan', name: 'Adhan', icon: '🕌', query: 'adhan OR azan call prayer' },
+    { id: 'nasheed', name: 'Nasheed', icon: '🎶', query: 'nasheed' },
+  ]},
+  { id: 'sufi', title: '🌀 Sufi Music', items: [
+    { id: 'sufi', name: 'Sufi Music', icon: '🌀', query: 'sufi music' },
+    { id: 'qawwali', name: 'Qawwali', icon: '🇵🇰', query: 'qawwali' },
+    { id: 'nusrat', name: 'Nusrat Fateh Ali Khan', icon: '👑', query: 'nusrat fateh ali khan' },
+    { id: 'mevlevi', name: 'Mevlevi Whirling', icon: '💫', query: 'mevlevi music OR whirling dervish' },
+    { id: 'dhikr', name: 'Dhikr', icon: '📿', query: 'dhikr music OR zikr' },
+    { id: 'gnawa', name: 'Gnawa', icon: '🇲🇦', query: 'gnawa music' },
+  ]},
+  { id: 'arabic', title: '🎵 Arabic Classical', items: [
+    { id: 'maqam', name: 'Maqam System', icon: '🎼', query: 'arabic maqam' },
+    { id: 'tarab', name: 'Tarab', icon: '💫', query: 'tarab OR arab classical' },
+    { id: 'oud', name: 'Oud', icon: '🪕', query: 'oud music' },
+    { id: 'umm-kulthum', name: 'Umm Kulthum', icon: '👑', query: 'umm kulthum' },
+    { id: 'fairuz', name: 'Fairuz', icon: '🇱🇧', query: 'fairuz' },
+    { id: 'andalusi', name: 'Andalusian', icon: '🏰', query: 'andalusian music OR al andalus' },
+    { id: 'muwashshah', name: 'Muwashshah', icon: '📜', query: 'muwashshah' },
+  ]},
+  { id: 'persian', title: '🇮🇷 Persian Classical', items: [
+    { id: 'persian-classical', name: 'Persian Classical', icon: '🇮🇷', query: 'persian classical music' },
+    { id: 'radif', name: 'Radif', icon: '📚', query: 'radif persian' },
+    { id: 'dastgah', name: 'Dastgah System', icon: '🎼', query: 'dastgah' },
+    { id: 'tar-setar', name: 'Tar & Setar', icon: '🪕', query: 'tar persian OR setar' },
+    { id: 'santur', name: 'Santur', icon: '🎹', query: 'santur persian' },
+    { id: 'shajarian', name: 'Shajarian', icon: '👑', query: 'shajarian' },
+  ]},
+  { id: 'turkish', title: '🇹🇷 Turkish Classical', items: [
+    { id: 'turkish-classical', name: 'Turkish Classical', icon: '🇹🇷', query: 'turkish classical music OR ottoman' },
+    { id: 'makam', name: 'Makam System', icon: '🎼', query: 'turkish makam' },
+    { id: 'fasil', name: 'Fasıl', icon: '🎭', query: 'fasil music' },
+    { id: 'ney', name: 'Ney Flute', icon: '🪈', query: 'ney flute' },
+    { id: 'ottoman-court', name: 'Ottoman Court', icon: '👑', query: 'ottoman court music' },
+  ]},
+  { id: 'indian', title: '🇮🇳 Indian Classical', items: [
+    { id: 'hindustani', name: 'Hindustani', icon: '🇮🇳', query: 'hindustani classical' },
+    { id: 'carnatic', name: 'Carnatic', icon: '🛕', query: 'carnatic music' },
+    { id: 'raga', name: 'Raga', icon: '🎵', query: 'raga OR raag' },
+    { id: 'dhrupad', name: 'Dhrupad', icon: '📜', query: 'dhrupad' },
+    { id: 'sitar', name: 'Sitar', icon: '🪕', query: 'sitar music' },
+    { id: 'tabla', name: 'Tabla', icon: '🥁', query: 'tabla music' },
+  ]},
+  { id: 'indianSacred', title: '🕉️ Indian Sacred', items: [
+    { id: 'vedic', name: 'Vedic Chanting', icon: '📜', query: 'vedic chanting OR veda recitation' },
+    { id: 'bhajan', name: 'Bhajan', icon: '🙏', query: 'bhajan devotional' },
+    { id: 'kirtan', name: 'Kirtan', icon: '🎶', query: 'kirtan' },
+    { id: 'mantra', name: 'Mantra', icon: '🕉️', query: 'mantra chanting' },
+    { id: 'sikh-kirtan', name: 'Sikh Kirtan', icon: '☬', query: 'sikh kirtan OR gurbani' },
+  ]},
+  { id: 'buddhist', title: '☸️ Buddhist', items: [
+    { id: 'buddhist-chant', name: 'Buddhist Chanting', icon: '☸️', query: 'buddhist chanting' },
+    { id: 'tibetan', name: 'Tibetan Buddhist', icon: '🏔️', query: 'tibetan buddhist music OR tibetan chanting' },
+    { id: 'throat-singing', name: 'Overtone Chanting', icon: '🎵', query: 'tibetan throat singing OR overtone' },
+    { id: 'shomyo', name: 'Shōmyō', icon: '🇯🇵', query: 'shomyo japanese buddhist' },
+    { id: 'zen', name: 'Zen', icon: '🎋', query: 'zen music OR zen buddhist' },
+  ]},
+  { id: 'eastAsian', title: '🎌 East Asian', items: [
+    { id: 'gagaku', name: 'Gagaku', icon: '🇯🇵', query: 'gagaku japanese court' },
+    { id: 'noh', name: 'Noh Theatre', icon: '🎭', query: 'noh music OR noh theatre' },
+    { id: 'shakuhachi', name: 'Shakuhachi', icon: '🪈', query: 'shakuhachi' },
+    { id: 'guqin', name: 'Guqin', icon: '🇨🇳', query: 'guqin' },
+    { id: 'pansori', name: 'Pansori', icon: '🇰🇷', query: 'pansori' },
+    { id: 'gamelan', name: 'Gamelan', icon: '🇮🇩', query: 'gamelan' },
+  ]},
+  { id: 'ancientMed', title: '🏛️ Ancient Mediterranean', items: [
+    { id: 'ancient-greek', name: 'Ancient Greek', icon: '🇬🇷', query: 'ancient greek music' },
+    { id: 'greek-modes', name: 'Greek Modes', icon: '🎼', query: 'greek modes dorian phrygian' },
+    { id: 'ancient-roman', name: 'Ancient Roman', icon: '🦅', query: 'ancient roman music' },
+    { id: 'seikilos', name: 'Seikilos Epitaph', icon: '📜', query: 'seikilos' },
+    { id: 'lyre', name: 'Ancient Lyre', icon: '🎸', query: 'ancient lyre' },
+  ]},
+  { id: 'ancientNear', title: '🏺 Ancient Near East', items: [
+    { id: 'mesopotamian', name: 'Mesopotamian', icon: '🏺', query: 'mesopotamian music OR sumerian' },
+    { id: 'hurrian', name: 'Hurrian Hymns', icon: '📜', query: 'hurrian hymn' },
+    { id: 'ancient-egypt', name: 'Ancient Egyptian', icon: '🇪🇬', query: 'ancient egyptian music' },
+    { id: 'ancient-hebrew', name: 'Ancient Hebrew', icon: '✡️', query: 'ancient hebrew music OR temple music' },
+  ]},
+  { id: 'renSacred', title: '⛪ Renaissance Sacred', items: [
+    { id: 'renaissance-mass', name: 'Renaissance Mass', icon: '⛪', query: 'renaissance mass' },
+    { id: 'palestrina', name: 'Palestrina', icon: '🇮🇹', query: 'palestrina' },
+    { id: 'victoria', name: 'Victoria', icon: '🇪🇸', query: 'tomas luis victoria' },
+    { id: 'lassus', name: 'Lassus', icon: '🇧🇪', query: 'lassus OR orlando di lasso' },
+    { id: 'byrd', name: 'William Byrd', icon: '🇬🇧', query: 'william byrd' },
+    { id: 'tallis', name: 'Thomas Tallis', icon: '🇬🇧', query: 'thomas tallis' },
+    { id: 'josquin', name: 'Josquin des Prez', icon: '🇫🇷', query: 'josquin' },
+  ]},
+  { id: 'renSecular', title: '🎭 Renaissance Secular', items: [
+    { id: 'madrigal', name: 'Italian Madrigal', icon: '🇮🇹', query: 'italian madrigal' },
+    { id: 'english-madrigal', name: 'English Madrigal', icon: '🇬🇧', query: 'english madrigal' },
+    { id: 'chanson-ren', name: 'French Chanson', icon: '🇫🇷', query: 'chanson renaissance' },
+    { id: 'villancico', name: 'Villancico', icon: '🇪🇸', query: 'villancico' },
+  ]},
+  { id: 'renInst', title: '🎻 Renaissance Instrumental', items: [
+    { id: 'consort-music', name: 'Consort Music', icon: '🎻', query: 'consort music OR viol consort' },
+    { id: 'lute-renaissance', name: 'Lute Music', icon: '🪕', query: 'renaissance lute' },
+    { id: 'dowland', name: 'John Dowland', icon: '🇬🇧', query: 'john dowland' },
+    { id: 'keyboard-ren', name: 'Keyboard Music', icon: '🎹', query: 'renaissance keyboard OR virginal' },
+    { id: 'dance-ren', name: 'Dance Music', icon: '💃', query: 'renaissance dance music OR pavane galliard' },
+  ]},
+  { id: 'plucked', title: '🪕 Plucked Strings', items: [
+    { id: 'lute', name: 'Lute', icon: '🪕', query: 'lute music' },
+    { id: 'theorbo', name: 'Theorbo', icon: '🎸', query: 'theorbo' },
+    { id: 'vihuela', name: 'Vihuela', icon: '🇪🇸', query: 'vihuela' },
+    { id: 'cittern', name: 'Cittern', icon: '🪕', query: 'cittern' },
+    { id: 'psaltery', name: 'Psaltery', icon: '🎵', query: 'psaltery' },
+    { id: 'dulcimer', name: 'Dulcimer', icon: '🔨', query: 'hammered dulcimer' },
+    { id: 'harp-historical', name: 'Historical Harp', icon: '🎼', query: 'medieval harp OR celtic harp' },
+  ]},
+  { id: 'bowed', title: '🎻 Bowed Strings', items: [
+    { id: 'viol', name: 'Viola da Gamba', icon: '🎻', query: 'viola da gamba' },
+    { id: 'rebec', name: 'Rebec', icon: '🎻', query: 'rebec' },
+    { id: 'vielle', name: 'Vielle', icon: '🎻', query: 'vielle OR medieval fiddle' },
+    { id: 'hurdy-gurdy', name: 'Hurdy Gurdy', icon: '🎵', query: 'hurdy gurdy' },
+  ]},
+  { id: 'winds', title: '🪈 Wind Instruments', items: [
+    { id: 'recorder', name: 'Recorder', icon: '🪈', query: 'recorder early music' },
+    { id: 'shawm', name: 'Shawm', icon: '🎺', query: 'shawm' },
+    { id: 'crumhorn', name: 'Crumhorn', icon: '🌀', query: 'crumhorn' },
+    { id: 'cornett', name: 'Cornett', icon: '📯', query: 'cornett zink' },
+    { id: 'sackbut', name: 'Sackbut', icon: '🎺', query: 'sackbut' },
+  ]},
+  { id: 'keyboard', title: '🎹 Keyboard', items: [
+    { id: 'organ-historical', name: 'Historical Organ', icon: '⛪', query: 'historical organ OR baroque organ' },
+    { id: 'harpsichord', name: 'Harpsichord', icon: '🎹', query: 'harpsichord' },
+    { id: 'clavichord', name: 'Clavichord', icon: '🎹', query: 'clavichord' },
+  ]},
+  { id: 'ensembles', title: '🎭 Early Music Ensembles', items: [
+    { id: 'anonymous-4', name: 'Anonymous 4', icon: '👩‍🎤', query: 'anonymous 4' },
+    { id: 'hilliard', name: 'Hilliard Ensemble', icon: '🎤', query: 'hilliard ensemble' },
+    { id: 'tallis-scholars', name: 'Tallis Scholars', icon: '🇬🇧', query: 'tallis scholars' },
+    { id: 'ensemble-organum', name: 'Ensemble Organum', icon: '🇫🇷', query: 'ensemble organum' },
+    { id: 'sequentia', name: 'Sequentia', icon: '🎵', query: 'sequentia ensemble' },
+    { id: 'hesperion', name: 'Hespèrion XXI', icon: '🇪🇸', query: 'hesperion savall' },
+  ]},
+  { id: 'composers', title: '👨‍🎤 Composers', items: [
+    { id: 'hildegard', name: 'Hildegard of Bingen', icon: '👑', query: 'hildegard bingen' },
+    { id: 'perotin', name: 'Pérotin', icon: '🏛️', query: 'perotin' },
+    { id: 'machaut', name: 'Machaut', icon: '🇫🇷', query: 'machaut' },
+    { id: 'dufay', name: 'Dufay', icon: '🇫🇷', query: 'dufay' },
+    { id: 'ockeghem', name: 'Ockeghem', icon: '🇫🇷', query: 'ockeghem' },
+    { id: 'gesualdo', name: 'Gesualdo', icon: '🇮🇹', query: 'gesualdo' },
+    { id: 'monteverdi', name: 'Monteverdi', icon: '🇮🇹', query: 'monteverdi' },
+  ]},
+  { id: 'liturgical', title: '📖 Liturgical Forms', items: [
+    { id: 'requiem', name: 'Requiem', icon: '🖤', query: 'requiem mass' },
+    { id: 'magnificat', name: 'Magnificat', icon: '👼', query: 'magnificat' },
+    { id: 'te-deum', name: 'Te Deum', icon: '🙏', query: 'te deum' },
+    { id: 'stabat-mater', name: 'Stabat Mater', icon: '💔', query: 'stabat mater' },
+    { id: 'lamentations', name: 'Lamentations', icon: '😢', query: 'lamentations jeremiah' },
+  ]},
+  { id: 'polyphonic', title: '🎼 Polyphonic Forms', items: [
+    { id: 'organum-form', name: 'Organum', icon: '🎵', query: 'organum medieval' },
+    { id: 'conductus', name: 'Conductus', icon: '📜', query: 'conductus medieval' },
+    { id: 'motet-form', name: 'Motet', icon: '🎼', query: 'motet medieval OR motet renaissance' },
+    { id: 'canon-round', name: 'Canon & Round', icon: '🔄', query: 'canon round medieval' },
+  ]},
+  { id: 'manuscripts', title: '📚 Manuscripts', items: [
+    { id: 'codex-calixtinus', name: 'Codex Calixtinus', icon: '📜', query: 'codex calixtinus' },
+    { id: 'las-huelgas', name: 'Las Huelgas Codex', icon: '📜', query: 'las huelgas codex' },
+    { id: 'montpellier', name: 'Montpellier Codex', icon: '📜', query: 'montpellier codex' },
+    { id: 'llibre-vermell', name: 'Llibre Vermell', icon: '📕', query: 'llibre vermell' },
+    { id: 'faenza', name: 'Faenza Codex', icon: '📜', query: 'faenza codex' },
+  ]},
+  { id: 'archive', title: '📀 Archive Collections', items: [
+    { id: '78rpm', name: '78rpm Archive', icon: '💿', collection: '78rpm' },
+    { id: 'librivox', name: 'LibriVox Hymns', icon: '🎙️', query: 'librivox hymn OR librivox psalm' },
+    { id: 'smithsonian', name: 'Smithsonian Folkways', icon: '🏛️', query: 'smithsonian folkways' },
+    { id: 'alan-lomax', name: 'Alan Lomax', icon: '🎤', query: 'alan lomax' },
+    { id: 'ethnomusicology', name: 'Ethnomusicology', icon: '🔬', query: 'ethnomusicology field recording' },
+  ]},
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// LOGGING
+// ═══════════════════════════════════════════════════════════════════
+const logEntries = [];
+const LOG_LEVEL = { error: 0, warn: 1, info: 2, debug: 3 };
+let currentLevel = LOG_LEVEL.debug;
+
+function log(level, ctx, msg, data) {
+  if (LOG_LEVEL[level] > currentLevel) return;
+  const ts = new Date().toISOString().split('T')[1].slice(0, 12);
+  const entry = { level, ctx, msg, data, ts };
+  logEntries.push(entry);
+  if (logEntries.length > 200) logEntries.shift();
+  
+  const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+  fn(`[${ts}][${level.toUpperCase()}][${ctx}]`, msg, data || '');
+  
+  updateLogPanel();
+}
+
+function updateLogPanel() {
+  const el = document.getElementById('log-content');
+  if (!el) return;
+  el.innerHTML = logEntries.slice(-50).map(e => 
+    `<div class="log-entry ${e.level}">[${e.ts}][${e.ctx}] ${e.msg}${e.data ? ' ' + JSON.stringify(e.data) : ''}</div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  logEntries.length = 0;
+  updateLogPanel();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const formatTime = s => s ? `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}` : '--:--';
+const escapeHtml = s => s ? s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : '';
+const sanitize = s => s ? DOMPurify.sanitize(s, { ALLOWED_TAGS: ['p','br','b','i','em','strong','a'], ALLOWED_ATTR: ['href'] }) : '';
+
+// ═══════════════════════════════════════════════════════════════════
+// LLM TOPIC REFINEMENT
+// ═══════════════════════════════════════════════════════════════════
+const LLM = {
+  async call(prompt, maxTokens = 500) {
+    log('info', 'llm', 'Calling LLM...', { promptLength: prompt.length });
+    try {
+      const res = await fetch(CONFIG.llm.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CONFIG.llm.apiKey}`,
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'Ancient Sounds Explorer',
+        },
+        body: JSON.stringify({
+          model: CONFIG.llm.model,
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`LLM error: ${res.status} ${err}`);
+      }
+      
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      log('info', 'llm', 'Response received', { length: content.length });
+      return content;
+    } catch (e) {
+      log('error', 'llm', e.message);
+      throw e;
+    }
+  },
+
+  // Parse JSON from LLM response (handles markdown code blocks)
+  parseJSON(text) {
+    // Strip markdown code blocks if present
+    let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    try {
+      return JSON.parse(clean);
+    } catch {
+      // Try to find JSON array in the text
+      const match = clean.match(/\[[\s\S]*\]/);
+      if (match) return JSON.parse(match[0]);
+      return null;
+    }
+  },
+
+  // Split a topic into finer subtopics
+  async subdivide(topic, context = '') {
+    const prompt = `You are a musicologist helping explore "${topic}" on the Internet Archive.
+
+Generate 5-8 specific subtopics that would help someone find actual audio recordings.
+Focus on: specific composers, specific time periods, specific regions, specific forms/genres, specific ensembles.
+
+${context ? `Context: ${context}` : ''}
+
+Return ONLY a JSON array of objects with:
+- name: short display name (2-4 words)
+- query: search query for Internet Archive (use OR for alternatives)
+- icon: single emoji
+
+Example format:
+[{"name": "Notre Dame School", "query": "leonin OR perotin OR notre dame organum", "icon": "⛪"}]`;
+
+    const response = await this.call(prompt);
+    return this.parseJSON(response);
+  },
+
+  // Find associated/related topics
+  async associate(topic, context = '') {
+    const prompt = `You are a musicologist helping explore "${topic}" on the Internet Archive.
+
+Generate 5-8 related or associated musical traditions that someone interested in "${topic}" might also enjoy.
+Think across cultures, time periods, and genres for unexpected connections.
+
+${context ? `Context: ${context}` : ''}
+
+Return ONLY a JSON array of objects with:
+- name: short display name (2-4 words)
+- query: search query for Internet Archive (use OR for alternatives)
+- icon: single emoji
+- reason: brief explanation of connection (1 sentence)
+
+Example format:
+[{"name": "Byzantine Chant", "query": "byzantine chant OR greek orthodox", "icon": "☦️", "reason": "Shares modal systems with Gregorian chant"}]`;
+
+    const response = await this.call(prompt);
+    return this.parseJSON(response);
+  },
+
+  // Generate keyword variations for better search
+  async reword(query, context = '') {
+    const prompt = `You are helping search the Internet Archive for audio recordings.
+
+The current search is: "${query}"
+
+Generate 5-8 alternative search queries that might find different or better results.
+Consider: synonyms, related terms, specific examples, different languages, historical terms.
+
+${context ? `Context: ${context}` : ''}
+
+Return ONLY a JSON array of objects with:
+- name: short description of this variation
+- query: the search query
+- icon: single emoji
+
+Example format:
+[{"name": "Latin terms", "query": "cantus firmus OR vox principalis", "icon": "📜"}]`;
+
+    const response = await this.call(prompt);
+    return this.parseJSON(response);
+  },
+
+  // Deep dive - comprehensive exploration
+  async explore(topic) {
+    const prompt = `You are a musicologist creating a comprehensive guide to "${topic}" for the Internet Archive.
+
+Create a structured exploration with 3-4 categories, each containing 3-5 specific items.
+Categories might include: Historical Periods, Regional Variants, Key Figures, Related Traditions, Instruments, etc.
+
+Return ONLY a JSON array of category objects:
+[{
+  "category": "Category Name",
+  "icon": "emoji",
+  "items": [
+    {"name": "Item Name", "query": "search query", "icon": "emoji"}
+  ]
+}]`;
+
+    const response = await this.call(prompt, 1000);
+    return this.parseJSON(response);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// USER PREFERENCES
+// ═══════════════════════════════════════════════════════════════════
+const Prefs = {
+  _key: 'ancient-sounds-prefs',
+  _data: { favorites: [], history: [], customTopics: [] },
+
+  init() {
+    try {
+      const raw = localStorage.getItem(this._key);
+      if (raw) this._data = { ...this._data, ...JSON.parse(raw) };
+    } catch (e) { log('warn', 'prefs', 'Failed to load prefs'); }
+  },
+
+  save() {
+    try {
+      localStorage.setItem(this._key, JSON.stringify(this._data));
+    } catch (e) { log('warn', 'prefs', 'Failed to save prefs'); }
+  },
+
+  addFavorite(topic) {
+    if (!this._data.favorites.find(f => f.id === topic.id)) {
+      this._data.favorites.push(topic);
+      this.save();
+    }
+  },
+
+  removeFavorite(id) {
+    this._data.favorites = this._data.favorites.filter(f => f.id !== id);
+    this.save();
+  },
+
+  isFavorite(id) {
+    return this._data.favorites.some(f => f.id === id);
+  },
+
+  getFavorites() {
+    return this._data.favorites;
+  },
+
+  addCustomTopic(topic) {
+    topic.id = 'custom-' + Date.now();
+    this._data.customTopics.push(topic);
+    this.save();
+    return topic;
+  },
+
+  getCustomTopics() {
+    return this._data.customTopics;
+  },
+
+  removeCustomTopic(id) {
+    this._data.customTopics = this._data.customTopics.filter(t => t.id !== id);
+    this.save();
+  },
+
+  addToHistory(topic) {
+    this._data.history = [topic, ...this._data.history.filter(h => h.id !== topic.id)].slice(0, 20);
+    this.save();
+  },
+
+  getHistory() {
+    return this._data.history;
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════════════
+const cache = new Map();
+
+async function apiFetch(url, signal) {
+  // Check cache
+  const cached = cache.get(url);
+  if (cached && Date.now() - cached.time < CONFIG.cache.freshTtlMs) {
+    log('debug', 'api', `Cache HIT`, { url: url.slice(0, 60) });
+    return { data: cached.data, cached: true, stale: false };
+  }
+
+  for (let attempt = 1; attempt <= CONFIG.network.maxRetries; attempt++) {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), CONFIG.network.timeoutMs);
+    if (signal?.aborted) throw new Error('Aborted');
+    signal?.addEventListener('abort', () => ctrl.abort());
+
+    const start = Date.now();
+    try {
+      log('debug', 'api', `Fetching (attempt ${attempt})`, { url: url.slice(0, 60) });
+      const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+      clearTimeout(timeout);
+      
+      log('debug', 'api', `${res.status} (${Date.now() - start}ms)`, { url: url.slice(0, 60) });
+
+      if (!res.ok) {
+        if (CONFIG.network.retryableStatuses.includes(res.status) && attempt < CONFIG.network.maxRetries) {
+          await sleep(CONFIG.network.retryBaseMs * Math.pow(2, attempt - 1));
+          continue;
+        }
+        if (cached) {
+          log('warn', 'api', 'Returning stale cache after error');
+          return { data: cached.data, cached: true, stale: true };
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      cache.set(url, { data, time: Date.now() });
+      return { data, cached: false, stale: false };
+
+    } catch (e) {
+      clearTimeout(timeout);
+      if (e.name === 'AbortError') throw new Error('Request timeout');
+      if (attempt >= CONFIG.network.maxRetries) {
+        if (cached) {
+          log('warn', 'api', 'Returning stale cache after error');
+          return { data: cached.data, cached: true, stale: true };
+        }
+        throw e;
+      }
+      await sleep(CONFIG.network.retryBaseMs * Math.pow(2, attempt - 1));
+    }
+  }
+}
+
+const API = {
+  async search(query, opts = {}) {
+    log('info', 'api', `Search: "${query}"`);
+    const params = new URLSearchParams({ q: query, output: 'json', rows: opts.rows || CONFIG.search.rows, page: opts.page || 1 });
+    params.append('sort[]', opts.sort || CONFIG.search.sort);
+    CONFIG.search.fields.forEach(f => params.append('fl[]', f));
+    const url = `${CONFIG.api.base}${CONFIG.api.search}?${params}`;
+    
+    const { data, cached, stale } = await apiFetch(url, opts.signal);
+    
+    if (!data?.response?.docs) throw new Error('Invalid response');
+    log('info', 'api', `Found ${data.response.numFound} items`, { cached, stale });
+    return { docs: data.response.docs, numFound: data.response.numFound, cached, stale };
+  },
+
+  async getMetadata(id, opts = {}) {
+    log('info', 'api', `Metadata: ${id}`);
+    const url = `${CONFIG.api.base}${CONFIG.api.metadata}/${encodeURIComponent(id)}`;
+    const { data, cached, stale } = await apiFetch(url, opts.signal);
+    
+    if (data.error) throw new Error('Item not found');
+    if (!data.metadata) throw new Error('Invalid response');
+    return { metadata: data.metadata, files: data.files || [], cached, stale };
+  },
+
+  extractAudio(files) {
+    return files
+      .filter(f => f.name && (CONFIG.audio.formats.includes(f.format) || CONFIG.audio.extensions.some(e => f.name.toLowerCase().endsWith(e))))
+      .sort((a, b) => {
+        const ai = CONFIG.audio.formats.indexOf(a.format), bi = CONFIG.audio.formats.indexOf(b.format);
+        if (ai !== -1 && bi === -1) return -1;
+        if (ai === -1 && bi !== -1) return 1;
+        if (ai !== bi) return ai - bi;
+        return (parseInt(a.track) || 999) - (parseInt(b.track) || 999);
+      })
+      .map(f => ({ name: f.name, title: f.title || f.name.replace(/\.[^.]+$/, ''), format: f.format, duration: f.length ? parseFloat(f.length) : null, artist: f.artist || f.creator }));
+  },
+
+  thumbUrl: id => `${CONFIG.api.base}${CONFIG.api.thumbnail}/${encodeURIComponent(id)}`,
+  downloadUrl: (id, file) => `${CONFIG.api.base}${CONFIG.api.download}/${encodeURIComponent(id)}/${encodeURIComponent(file)}`,
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// PLAYLIST
+// ═══════════════════════════════════════════════════════════════════
+const Playlist = {
+  _tracks: [],
+  _listeners: new Set(),
+
+  init() {
+    try {
+      const raw = localStorage.getItem(CONFIG.cache.key);
+      if (raw) {
+        const { tracks } = JSON.parse(raw);
+        if (Array.isArray(tracks)) {
+          this._tracks = tracks;
+          log('info', 'playlist', `Loaded ${tracks.length} tracks`);
+        }
+      }
+    } catch (e) { log('warn', 'playlist', 'Failed to load', { error: e.message }); }
+  },
+
+  _save() {
+    try {
+      localStorage.setItem(CONFIG.cache.key, JSON.stringify({ version: 1, tracks: this._tracks }));
+    } catch (e) { log('error', 'playlist', 'Failed to save', { error: e.message }); }
+  },
+
+  _notify() {
+    const state = this.getState();
+    this._listeners.forEach(fn => fn(state));
+  },
+
+  subscribe(fn) {
+    this._listeners.add(fn);
+    fn(this.getState());
+    return () => this._listeners.delete(fn);
+  },
+
+  getState() {
+    return {
+      tracks: [...this._tracks],
+      count: this._tracks.length,
+      duration: this._tracks.reduce((s, t) => s + (t.duration || 0), 0),
+    };
+  },
+
+  add(track) {
+    if (this._tracks.some(t => t.identifier === track.identifier && t.filename === track.filename)) {
+      return false;
+    }
+    this._tracks.push({ ...track, addedAt: new Date().toISOString() });
+    log('info', 'playlist', `Added: ${track.title}`);
+    this._save();
+    this._notify();
+    return true;
+  },
+
+  remove(i) {
+    if (i < 0 || i >= this._tracks.length) return;
+    const [t] = this._tracks.splice(i, 1);
+    log('info', 'playlist', `Removed: ${t.title}`);
+    this._save();
+    this._notify();
+  },
+
+  clear() {
+    this._tracks = [];
+    log('info', 'playlist', 'Cleared');
+    this._save();
+    this._notify();
+  },
+
+  exportM3U() {
+    let m3u = '#EXTM3U\n\n';
+    for (const t of this._tracks) {
+      m3u += `#EXTINF:${Math.round(t.duration || -1)},${t.artist ? `${t.artist} - ` : ''}${t.title}\n`;
+      m3u += `${API.downloadUrl(t.identifier, t.filename)}\n\n`;
+    }
+    const blob = new Blob([m3u], { type: 'audio/x-mpegurl' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'archive-playlist.m3u';
+    a.click();
+    log('info', 'playlist', 'Exported M3U');
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// PLAYER
+// ═══════════════════════════════════════════════════════════════════
+const Player = {
+  _audio: null,
+  _state: { status: 'idle', track: null, position: 0, duration: 0, volume: CONFIG.audio.volume, error: null },
+  _listeners: new Set(),
+
+  init() {
+    this._audio = new Audio();
+    this._audio.volume = this._state.volume;
+
+    const events = {
+      loadedmetadata: () => { this._state.duration = this._audio.duration || 0; this._notify(); },
+      playing: () => { this._state.status = 'playing'; this._notify(); },
+      pause: () => { if (this._state.status !== 'idle') { this._state.status = 'paused'; this._notify(); } },
+      ended: () => { this._state.status = 'idle'; this._state.position = 0; this._notify(); },
+      timeupdate: () => { this._state.position = this._audio.currentTime; this._notify(); },
+      error: () => {
+        const codes = { 1: 'Aborted', 2: 'Network', 3: 'Decode', 4: 'Unsupported' };
+        this._state.error = codes[this._audio.error?.code] || 'Error';
+        this._state.status = 'error';
+        log('error', 'player', this._state.error);
+        this._notify();
+      },
+    };
+    Object.entries(events).forEach(([e, h]) => this._audio.addEventListener(e, h));
+    log('info', 'player', 'Initialized');
+  },
+
+  _notify() {
+    const state = this.getState();
+    this._listeners.forEach(fn => fn(state));
+  },
+
+  subscribe(fn) {
+    this._listeners.add(fn);
+    fn(this.getState());
+    return () => this._listeners.delete(fn);
+  },
+
+  getState() { return { ...this._state }; },
+
+  async load(track) {
+    log('info', 'player', `Loading: ${track.title}`);
+    this._state = { ...this._state, status: 'loading', track, position: 0, duration: 0, error: null };
+    this._notify();
+    
+    this._audio.src = API.downloadUrl(track.identifier, track.filename);
+    try {
+      await this._audio.play();
+    } catch (e) {
+      if (e.name === 'NotAllowedError') {
+        log('info', 'player', 'Autoplay blocked');
+        this._state.status = 'paused';
+      } else {
+        this._state.error = e.message;
+        this._state.status = 'error';
+      }
+      this._notify();
+    }
+  },
+
+  play() { this._audio?.play().catch(() => {}); },
+  pause() { this._audio?.pause(); },
+  toggle() { this._state.status === 'playing' ? this.pause() : this.play(); },
+  seek(pct) { if (this._state.duration) this._audio.currentTime = pct * this._state.duration; },
+  setVolume(v) { this._state.volume = v; this._audio.volume = v; this._notify(); },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════════════════
+const App = {
+  _state: { 
+    collection: null, 
+    query: '', 
+    items: [], 
+    status: 'idle', 
+    error: null, 
+    stale: false, 
+    toast: null,
+    // LLM-generated refinements
+    subtopics: [],
+    associations: [],
+    rewrites: [],
+    llmStatus: 'idle', // idle, loading, error
+    currentTopic: null, // { name, query, icon }
+  },
+  _listeners: new Set(),
+  _ctrl: null,
+
+  subscribe(fn) {
+    this._listeners.add(fn);
+    fn(this._state);
+    return () => this._listeners.delete(fn);
+  },
+
+  _notify() { this._listeners.forEach(fn => fn(this._state)); },
+
+  async selectCollection(id) {
+    log('info', 'app', `Collection: ${id || 'all'}`);
+    this._state.collection = id;
+    this._state.query = '';
+    // Find the topic info
+    this._state.currentTopic = findCollection(id);
+    // Clear LLM state
+    this._state.subtopics = [];
+    this._state.associations = [];
+    this._state.rewrites = [];
+    // Track in history
+    if (this._state.currentTopic) {
+      Prefs.addToHistory(this._state.currentTopic);
+    }
+    this._notify();
+    await this.load();
+  },
+
+  async selectCustom(topic) {
+    log('info', 'app', `Custom topic: ${topic.name}`);
+    this._state.collection = topic.id;
+    this._state.query = '';
+    this._state.currentTopic = topic;
+    this._state.subtopics = [];
+    this._state.associations = [];
+    this._state.rewrites = [];
+    Prefs.addToHistory(topic);
+    this._notify();
+    await this.loadQuery(topic.query);
+  },
+
+  async search(q) {
+    log('info', 'app', `Search: ${q}`);
+    this._state.query = q;
+    this._state.currentTopic = { name: q, query: q, icon: '🔍', id: 'search-' + Date.now() };
+    this._notify();
+    await this.load();
+  },
+
+  async load() {
+    this._ctrl?.abort();
+    this._ctrl = new AbortController();
+    this._state.status = 'loading';
+    this._state.error = null;
+    this._notify();
+
+    // Build query based on selected collection
+    let q = 'mediatype:audio';
+    let topicQuery = '';
+    
+    if (this._state.collection) {
+      // Check custom topics first
+      const customTopic = Prefs.getCustomTopics().find(t => t.id === this._state.collection);
+      if (customTopic) {
+        topicQuery = customTopic.query;
+        q = `(${topicQuery}) AND ${q}`;
+      } else {
+        // Find collection in SECTIONS
+        const col = findCollection(this._state.collection);
+        if (col) {
+          topicQuery = col.query || '';
+          if (col.collection) {
+            q = `collection:${col.collection} AND ${q}`;
+          } else if (col.query) {
+            q = `(${col.query}) AND ${q}`;
+          }
+        }
+      }
+    }
+    
+    if (this._state.query) {
+      q = `(${this._state.query}) AND ${q}`;
+    }
+
+    try {
+      const { docs, stale } = await API.search(q, { signal: this._ctrl.signal });
+      // Apply smart sorting
+      this._state.items = smartSort(docs);
+      this._state.stale = stale;
+      this._state.status = 'success';
+    } catch (e) {
+      if (e.message === 'Aborted') return;
+      this._state.error = e.message;
+      this._state.status = 'error';
+      log('error', 'app', e.message);
+    }
+    this._notify();
+  },
+
+  async loadQuery(query) {
+    this._ctrl?.abort();
+    this._ctrl = new AbortController();
+    this._state.status = 'loading';
+    this._state.error = null;
+    this._notify();
+
+    const q = `(${query}) AND mediatype:audio`;
+    try {
+      const { docs, stale } = await API.search(q, { signal: this._ctrl.signal });
+      this._state.items = smartSort(docs);
+      this._state.stale = stale;
+      this._state.status = 'success';
+    } catch (e) {
+      if (e.message === 'Aborted') return;
+      this._state.error = e.message;
+      this._state.status = 'error';
+    }
+    this._notify();
+  },
+
+  // LLM refinement methods
+  async subdivide() {
+    if (!this._state.currentTopic) return;
+    this._state.llmStatus = 'loading';
+    this._notify();
+    try {
+      const results = await LLM.subdivide(this._state.currentTopic.name, this._state.currentTopic.query);
+      this._state.subtopics = results || [];
+      this._state.llmStatus = 'idle';
+    } catch (e) {
+      this._state.llmStatus = 'error';
+      this.toast('Failed to generate subtopics');
+    }
+    this._notify();
+  },
+
+  async associate() {
+    if (!this._state.currentTopic) return;
+    this._state.llmStatus = 'loading';
+    this._notify();
+    try {
+      const results = await LLM.associate(this._state.currentTopic.name, this._state.currentTopic.query);
+      this._state.associations = results || [];
+      this._state.llmStatus = 'idle';
+    } catch (e) {
+      this._state.llmStatus = 'error';
+      this.toast('Failed to generate associations');
+    }
+    this._notify();
+  },
+
+  async reword() {
+    if (!this._state.currentTopic) return;
+    this._state.llmStatus = 'loading';
+    this._notify();
+    try {
+      const results = await LLM.reword(this._state.currentTopic.query || this._state.currentTopic.name);
+      this._state.rewrites = results || [];
+      this._state.llmStatus = 'idle';
+    } catch (e) {
+      this._state.llmStatus = 'error';
+      this.toast('Failed to generate rewrites');
+    }
+    this._notify();
+  },
+
+  saveTopic(topic) {
+    const saved = Prefs.addCustomTopic(topic);
+    this.toast(`Saved "${topic.name}" to your topics`);
+    this._notify();
+    return saved;
+  },
+
+  toggleFavorite(topic) {
+    if (Prefs.isFavorite(topic.id)) {
+      Prefs.removeFavorite(topic.id);
+      this.toast(`Removed from favorites`);
+    } else {
+      Prefs.addFavorite(topic);
+      this.toast(`Added to favorites`);
+    }
+    this._notify();
+  },
+
+  async playItem(item) {
+    log('info', 'app', `Play: ${item.identifier}`);
+    try {
+      const { metadata, files } = await API.getMetadata(item.identifier);
+      const audio = API.extractAudio(files);
+      if (!audio.length) { this.toast('No playable audio'); return; }
+      
+      const track = {
+        identifier: item.identifier,
+        filename: audio[0].name,
+        title: audio[0].title,
+        artist: Array.isArray(metadata.creator) ? metadata.creator[0] : metadata.creator,
+        duration: audio[0].duration,
+      };
+      
+      await Player.load(track);
+      if (Playlist.add(track)) this.toast(`Added "${track.title}"`);
+    } catch (e) {
+      log('error', 'app', e.message);
+      this.toast(`Error: ${e.message}`);
+    }
+  },
+
+  toast(msg) {
+    this._state.toast = msg;
+    this._notify();
+    setTimeout(() => { this._state.toast = null; this._notify(); }, 3000);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+function findCollection(id) {
+  for (const section of SECTIONS) {
+    const item = section.items.find(c => c.id === id);
+    if (item) return item;
+  }
+  return null;
+}
+
+function render(app, player, playlist) {
+  const root = document.getElementById('app');
+  const col = findCollection(app.collection);
+  const colName = col?.name || 'All Audio';
+  const title = app.query ? `Search: "${escapeHtml(app.query)}"` : colName;
+
+  root.innerHTML = `
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+    
+    <header class="header">
+      <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+      <div class="logo"><div class="logo-icon">🏰</div><span>Ancient Sounds</span></div>
+      <form class="search-form" onsubmit="event.preventDefault();App.search(this.querySelector('input').value)">
+        <span class="search-icon">🔍</span>
+        <input type="search" class="search-input" placeholder="Search..." value="${escapeHtml(app.query)}">
+      </form>
+      <button class="mobile-playlist-btn" onclick="togglePlaylist()">
+        🎵${playlist.count > 0 ? `<span class="badge">${playlist.count}</span>` : ''}
+      </button>
+      <div class="status">
+        <div class="status-dot ${app.stale ? 'stale' : app.status === 'error' ? 'error' : ''}"></div>
+        <span>${app.stale ? 'Cached' : app.status === 'error' ? 'Error' : 'Connected'}</span>
+      </div>
+    </header>
+
+    <nav class="sidebar">
+      <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Browse</div>
+        <button class="nav-btn ${!app.collection ? 'active' : ''}" onclick="App.selectCollection(null);closeMobileMenus()">
+          <span class="nav-icon">🏠</span><span>All Audio</span>
+        </button>
+      </div>
+      ${Prefs.getFavorites().length ? `
+        <div class="sidebar-section">
+          <div class="sidebar-title">⭐ Favorites</div>
+          ${Prefs.getFavorites().map(c => `
+            <button class="nav-btn sidebar-fav ${app.collection === c.id ? 'active' : ''}" onclick="App.selectCustom(${JSON.stringify(c).replace(/"/g, '&quot;')});closeMobileMenus()">
+              <span class="nav-icon">${c.icon || '📌'}</span><span>${escapeHtml(c.name)}</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+      ${Prefs.getCustomTopics().length ? `
+        <div class="sidebar-section">
+          <div class="sidebar-title">💾 Saved Topics</div>
+          ${Prefs.getCustomTopics().map(c => `
+            <button class="nav-btn ${app.collection === c.id ? 'active' : ''}" onclick="App.selectCustom(${JSON.stringify(c).replace(/"/g, '&quot;')});closeMobileMenus()">
+              <span class="nav-icon">${c.icon || '📌'}</span><span>${escapeHtml(c.name)}</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+      ${Prefs.getHistory().length ? `
+        <div class="sidebar-section">
+          <div class="sidebar-title">🕐 Recent</div>
+          ${Prefs.getHistory().slice(0, 5).map(c => `
+            <button class="nav-btn ${app.collection === c.id ? 'active' : ''}" onclick="App.selectCustom(${JSON.stringify(c).replace(/"/g, '&quot;')});closeMobileMenus()">
+              <span class="nav-icon">${c.icon || '📌'}</span><span>${escapeHtml(c.name)}</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+      ${SECTIONS.map(section => `
+        <div class="sidebar-section">
+          <div class="sidebar-title">${section.title}</div>
+          ${section.items.map(c => `
+            <button class="nav-btn ${app.collection === c.id ? 'active' : ''}" onclick="App.selectCollection('${c.id}');closeMobileMenus()">
+              <span class="nav-icon">${c.icon}</span><span>${c.name}</span>
+            </button>
+          `).join('')}
+        </div>
+      `).join('')}
+    </nav>
+
+    <main class="main">
+      <div class="content-header">
+        <div class="content-header-row">
+          <h1 class="content-title">${escapeHtml(app.currentTopic?.icon || '')} ${title}</h1>
+          ${app.currentTopic ? `<button class="fav-toggle ${Prefs.isFavorite(app.currentTopic.id) ? 'active' : ''}" onclick="App.toggleFavorite(App._state.currentTopic)" title="Toggle favorite">${Prefs.isFavorite(app.currentTopic.id) ? '⭐' : '☆'}</button>` : ''}
+        </div>
+        <p class="content-meta">${app.status === 'loading' ? 'Loading...' : app.status === 'error' ? 'Error' : `${app.items.length} items`}${app.stale ? ' (cached)' : ''}</p>
+      </div>
+      
+      ${app.currentTopic ? `
+        <div class="refine-toolbar">
+          <span class="refine-toolbar-label">Refine with AI:</span>
+          <button class="refine-btn ${app.llmStatus === 'loading' ? 'loading' : ''}" onclick="App.subdivide()" ${app.llmStatus === 'loading' ? 'disabled' : ''}>
+            ${app.llmStatus === 'loading' ? '<span class="refine-spinner"></span>' : '<span class="icon">🔬</span>'}
+            <span>Subdivide</span>
+          </button>
+          <button class="refine-btn ${app.llmStatus === 'loading' ? 'loading' : ''}" onclick="App.associate()" ${app.llmStatus === 'loading' ? 'disabled' : ''}>
+            ${app.llmStatus === 'loading' ? '<span class="refine-spinner"></span>' : '<span class="icon">🔗</span>'}
+            <span>Related</span>
+          </button>
+          <button class="refine-btn ${app.llmStatus === 'loading' ? 'loading' : ''}" onclick="App.reword()" ${app.llmStatus === 'loading' ? 'disabled' : ''}>
+            ${app.llmStatus === 'loading' ? '<span class="refine-spinner"></span>' : '<span class="icon">✨</span>'}
+            <span>Reword</span>
+          </button>
+        </div>
+      ` : ''}
+      
+      ${(app.subtopics.length || app.associations.length || app.rewrites.length) ? `
+        <div class="topics-panel">
+          ${app.subtopics.length ? `
+            <div class="topics-section">
+              <div class="topics-header">
+                <span class="topics-title">🔬 Subtopics</span>
+              </div>
+              <div class="topics-grid">
+                ${app.subtopics.map(t => `
+                  <button class="topic-chip" onclick="App.selectCustom({id:'gen-${Date.now()}-${Math.random().toString(36).slice(2,6)}',name:'${escapeHtml(t.name)}',query:'${escapeHtml(t.query)}',icon:'${t.icon}'})">
+                    <span class="icon">${t.icon}</span>
+                    <span>${escapeHtml(t.name)}</span>
+                    <span class="save-btn" onclick="event.stopPropagation();App.saveTopic({name:'${escapeHtml(t.name)}',query:'${escapeHtml(t.query)}',icon:'${t.icon}'})">💾</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${app.associations.length ? `
+            <div class="topics-section">
+              <div class="topics-header">
+                <span class="topics-title">🔗 Related Traditions</span>
+              </div>
+              <div class="topics-grid">
+                ${app.associations.map(t => `
+                  <button class="topic-chip" onclick="App.selectCustom({id:'gen-${Date.now()}-${Math.random().toString(36).slice(2,6)}',name:'${escapeHtml(t.name)}',query:'${escapeHtml(t.query)}',icon:'${t.icon}'})" title="${escapeHtml(t.reason || '')}">
+                    <span class="icon">${t.icon}</span>
+                    <span>${escapeHtml(t.name)}</span>
+                    ${t.reason ? `<span class="topic-reason">${escapeHtml(t.reason.slice(0, 40))}...</span>` : ''}
+                    <span class="save-btn" onclick="event.stopPropagation();App.saveTopic({name:'${escapeHtml(t.name)}',query:'${escapeHtml(t.query)}',icon:'${t.icon}'})">💾</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${app.rewrites.length ? `
+            <div class="topics-section">
+              <div class="topics-header">
+                <span class="topics-title">✨ Alternative Queries</span>
+              </div>
+              <div class="topics-grid">
+                ${app.rewrites.map(t => `
+                  <button class="topic-chip" onclick="App.selectCustom({id:'gen-${Date.now()}-${Math.random().toString(36).slice(2,6)}',name:'${escapeHtml(t.name)}',query:'${escapeHtml(t.query)}',icon:'${t.icon}'})">
+                    <span class="icon">${t.icon}</span>
+                    <span>${escapeHtml(t.name)}</span>
+                    <span class="save-btn" onclick="event.stopPropagation();App.saveTopic({name:'${escapeHtml(t.name)}',query:'${escapeHtml(t.query)}',icon:'${t.icon}'})">💾</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+      
+      ${app.status === 'loading' && !app.items.length ? `<div class="state-box"><div class="spinner"></div></div>` :
+        app.status === 'error' && !app.items.length ? `<div class="state-box"><div class="state-icon">⚠️</div><h2 class="state-title">Failed</h2><p class="state-text">${escapeHtml(app.error)}</p><button class="btn btn-primary" onclick="App.load()">Retry</button></div>` :
+        !app.items.length ? `<div class="state-box"><div class="state-icon">📭</div><h2 class="state-title">No results</h2><p class="state-text">Try the AI refinement buttons above</p></div>` :
+        `<div class="item-grid">${app.items.map(item => `
+          <article class="item-card" data-id="${item.identifier}">
+            <div class="item-cover">
+              <img src="${API.thumbUrl(item.identifier)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy">
+              <div class="item-fallback" style="display:none">🎵</div>
+              <button class="item-play" onclick="event.stopPropagation();App.playItem(App._state.items.find(i=>i.identifier==='${item.identifier}'))"><span>▶</span></button>
+            </div>
+            <div class="item-info">
+              <h3 class="item-title">${escapeHtml(item.title || item.identifier)}</h3>
+              <p class="item-artist">${escapeHtml(Array.isArray(item.creator) ? item.creator[0] : item.creator || '')}</p>
+            </div>
+          </article>
+        `).join('')}</div>`}
+    </main>
+
+    <aside class="playlist">
+      <button class="playlist-close" onclick="togglePlaylist()">×</button>
+      <div class="playlist-header">
+        <div class="playlist-label">Playlist</div>
+        <h2 class="playlist-name">Codex Sonorum</h2>
+        <p class="playlist-stats">${playlist.count} tracks • ${formatTime(playlist.duration)}</p>
+      </div>
+      <div class="playlist-tracks">
+        ${playlist.count === 0 ? `<div class="playlist-empty"><div class="playlist-empty-icon">🎵</div><h3 class="playlist-empty-title">Start building</h3><p class="playlist-empty-text">Click play to add tracks</p></div>` :
+          playlist.tracks.map((t, i) => `
+            <button class="playlist-track ${player.track?.filename === t.filename ? 'playing' : ''}" onclick="Player.load(Playlist._tracks[${i}])">
+              <span class="track-num">${i + 1}</span>
+              <div class="track-info"><div class="track-title">${escapeHtml(t.title)}</div><div class="track-artist">${escapeHtml(t.artist || '')}</div></div>
+              <span class="track-duration">${formatTime(t.duration)}</span>
+              <button class="track-remove" onclick="event.stopPropagation();Playlist.remove(${i})">×</button>
+            </button>
+          `).join('')}
+      </div>
+      <div class="playlist-footer">
+        <button class="btn btn-primary" ${playlist.count === 0 ? 'disabled' : ''} onclick="Playlist.exportM3U()">Export M3U</button>
+        <button class="btn btn-secondary" ${playlist.count === 0 ? 'disabled' : ''} onclick="Playlist.clear()">Clear</button>
+      </div>
+    </aside>
+
+    <div class="player" style="--progress: ${player.duration ? (player.position / player.duration * 100) : 0}%">
+      <div class="player-track">
+        ${player.track ? `
+          <div class="player-cover"><img src="${API.thumbUrl(player.track.identifier)}"></div>
+          <div><div class="player-title">${escapeHtml(player.track.title)}</div><div class="player-artist">${escapeHtml(player.track.artist || '')}</div></div>
+        ` : '<span style="color:var(--text-2)">No track</span>'}
+      </div>
+      <div class="player-controls">
+        <div class="player-buttons">
+          <button class="player-btn" disabled>⏮</button>
+          <button class="player-btn player-btn-main" ${!player.track ? 'disabled' : ''} onclick="Player.toggle()">${player.status === 'playing' ? '⏸' : '▶'}</button>
+          <button class="player-btn" disabled>⏭</button>
+        </div>
+        <div class="player-progress">
+          <span class="player-time">${formatTime(player.position)}</span>
+          <div class="progress-bar" onclick="Player.seek(event.offsetX/this.offsetWidth)">
+            <div class="progress-fill" style="width:${player.duration ? (player.position / player.duration * 100) : 0}%"></div>
+          </div>
+          <span class="player-time">${formatTime(player.duration)}</span>
+        </div>
+        ${player.error ? `<div class="player-error">${escapeHtml(player.error)}</div>` : ''}
+      </div>
+      <div class="player-volume">
+        <button class="player-btn">🔊</button>
+        <div class="volume-bar" onclick="Player.setVolume(event.offsetX/this.offsetWidth)">
+          <div class="volume-fill" style="width:${player.volume * 100}%"></div>
+        </div>
+      </div>
+    </div>
+
+    ${app.toast ? `<div class="toast-container"><div class="toast">${escapeHtml(app.toast)}</div></div>` : ''}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MOBILE MENU FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+function toggleSidebar() {
+  document.querySelector('.sidebar')?.classList.toggle('open');
+  document.querySelector('.sidebar-backdrop')?.classList.toggle('open');
+}
+
+function togglePlaylist() {
+  document.querySelector('.playlist')?.classList.toggle('open');
+}
+
+function closeMobileMenus() {
+  document.querySelector('.sidebar')?.classList.remove('open');
+  document.querySelector('.sidebar-backdrop')?.classList.remove('open');
+  document.querySelector('.playlist')?.classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+function init() {
+  log('info', 'app', 'Starting...');
+  
+  Prefs.init();
+  Playlist.init();
+  Player.init();
+
+  let appState = App._state;
+  let playerState = Player.getState();
+  let playlistState = Playlist.getState();
+
+  App.subscribe(s => { appState = s; render(appState, playerState, playlistState); });
+  Player.subscribe(s => { playerState = s; render(appState, playerState, playlistState); });
+  Playlist.subscribe(s => { playlistState = s; render(appState, playerState, playlistState); });
+
+  // Log toggle
+  document.getElementById('log-toggle').onclick = () => {
+    document.getElementById('log-panel').classList.toggle('open');
+  };
+
+  App.selectCollection('gregorian');
+  log('info', 'app', 'Ready - 248 research threads + AI refinement');
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+  </script>
+</body>
+</html>
