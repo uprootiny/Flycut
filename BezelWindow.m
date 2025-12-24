@@ -69,15 +69,26 @@
 
 // Robust Mapping: Gimbal (Mouse Position) to Semantic Space
 - (void)updateWithGimbalX:(CGFloat)x y:(CGFloat)y {
-    // Map normalized X/Y (-1 to 1) to UI state or LLM params
-    CGFloat alpha = 0.5 + (y * 0.5); // Tilt affects transparency/perspective
-    [self.animator setAlphaValue:MAX(0.2, alpha)];
-    
-    // Physical feedback: Move the window slightly based on 'drift'
+    // Clamp inputs to prevent overflow/unexpected behavior
+    CGFloat clampedX = MAX(-1.0, MIN(1.0, x));
+    CGFloat clampedY = MAX(-1.0, MIN(1.0, y));
+
+    // Map normalized X/Y (-1 to 1) to UI state
+    CGFloat targetAlpha = 0.5 + (clampedY * 0.5);
+    [self.animator setAlphaValue:MAX(0.2, MIN(1.0, targetAlpha))];
+
+    // Prevent "Screen Drift" - Keep window within visible screen bounds
     NSRect currentFrame = self.frame;
-    currentFrame.origin.x += x * 5.0;
-    currentFrame.origin.y += y * 5.0;
-    [self setFrame:currentFrame display:YES];
+    NSRect screenFrame = [[NSScreen mainScreen] visibleFrame];
+
+    CGFloat driftX = clampedX * 10.0;
+    CGFloat driftY = clampedY * 10.0;
+
+    NSRect targetFrame = NSOffsetRect(currentFrame, driftX, driftY);
+
+    if (NSContainsRect(screenFrame, targetFrame)) {
+        [self setFrame:targetFrame display:YES animate:NO];
+    }
 }
 
 @end
