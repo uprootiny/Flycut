@@ -9,7 +9,52 @@
 @property (nonatomic, strong) NSTextField *positionLabel;
 @end
 
+@interface BezelWindow ()
+@property (atomic, assign) BOOL isAnimating;
+@end
+
 @implementation BezelWindow
+
+// ... existing code ...
+
+- (void)showWithQuicksilverAnimation {
+    if (self.isAnimating) return;
+    self.isAnimating = YES;
+
+    // Start state: invisible, slightly smaller
+    [self setAlphaValue:0.0];
+    NSRect targetFrame = self.frame;
+    NSRect startFrame = NSInsetRect(targetFrame, 10, 10);
+    [self setFrame:startFrame display:NO];
+
+    [self makeKeyAndOrderFront:nil];
+
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.15;
+        context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
+        [self.animator setAlphaValue:1.0];
+        [self.animator setFrame:targetFrame display:YES];
+    } completionHandler:^{
+        self.isAnimating = NO;
+    }];
+}
+
+- (void)hideWithQuicksilverAnimation {
+    if (self.isAnimating) return;
+    self.isAnimating = YES;
+
+    NSRect endFrame = NSInsetRect(self.frame, 10, 10);
+
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.12;
+        context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
+        [self.animator setAlphaValue:0.0];
+        [self.animator setFrame:endFrame display:YES];
+    } completionHandler:^{
+        [self orderOut:nil];
+        self.isAnimating = NO;
+    }];
+}
 
 - (instancetype)initWithContentRect:(NSRect)contentRect
                           styleMask:(NSWindowStyleMask)style
